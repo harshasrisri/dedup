@@ -1,7 +1,6 @@
 extern crate md5;
 
 use std::fs;
-use std::env;
 use std::io::Result;
 use std::fs::File;
 use std::path::Path;
@@ -39,7 +38,7 @@ fn md5 (path: &Path) -> Result<String> {
     bytes2string(&sh.result())
 }
 
-fn dedup_from_set (dir : &Path, checksums : &mut HashSet<String>) -> Result<()> {
+fn dedup_from_set (dir : &Path, checksums : &HashSet<String>) -> Result<()> {
     if dir.is_dir() == false {
         return Ok(());
     }
@@ -49,7 +48,7 @@ fn dedup_from_set (dir : &Path, checksums : &mut HashSet<String>) -> Result<()> 
     for path in fs::read_dir(dir)? {
         let path = path.unwrap();
         if path.path().is_dir() == true {
-            dedup_from_set (&path.path(), checksums);
+            let _ = dedup_from_set (&path.path(), checksums);
         } else {
             let chksum = match md5(&path.path()) {
                 Ok(sum) => sum,
@@ -78,5 +77,5 @@ fn main() {
         checksums.insert(hashpath[0].to_string());
     }
 
-    dedup_from_set(&local, &mut checksums);
+    let _ = dedup_from_set(&local, &checksums);
 }
