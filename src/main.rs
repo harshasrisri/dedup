@@ -1,12 +1,13 @@
 extern crate md5;
+extern crate ignore;
 
-use std::fs;
 use std::io::Result;
 use std::fs::File;
 use std::path::Path;
 use std::io::{BufRead, BufReader, Read};
 use std::collections::HashSet;
 use md5::{Md5,Digest};
+use ignore::Walk;
 
 const BUFFER_SIZE:usize = 1024;
 
@@ -38,28 +39,16 @@ fn md5 (path: &Path) -> Result<String> {
     bytes2string(&sh.result())
 }
 
-fn dedup_from_set (dir : &Path, checksums : &HashSet<String>) -> Result<()> {
-    if dir.is_dir() == false {
-        return Ok(());
+fn dedup_from_set (filepath : &Path, checksums : &HashSet<String>) {
+    if filepath.is_dir() == true {
+        return;
     }
 
-    println!("Processing directory {}", &dir.to_str().unwrap());
+    let chksum = md5(&filepath).expect(&format!("Error calculating MD5Sum of {}", &filepath.to_str().unwrap()));
 
-    for path in fs::read_dir(dir)? {
-        let path = path.unwrap();
-        if path.path().is_dir() == true {
-            let _ = dedup_from_set (&path.path(), checksums);
-        } else {
-            let chksum = match md5(&path.path()) {
-                Ok(sum) => sum,
-                Err(_)  => continue
-            };
-            if checksums.contains(&chksum) {
-                println!("rm -v {}", &path.path().to_str().unwrap());
-            }
-        }
+    if checksums.contains(&chksum) {
+        println!("rm -v {}", &filepath.to_str().unwrap());
     }
-    Ok(())
 }
 
 fn main() {
@@ -77,5 +66,10 @@ fn main() {
         checksums.insert(hashpath[0].to_string());
     }
 
-    let _ = dedup_from_set(&local, &checksums);
+    for filepath in Walk::new(&local) {
+        match filepath {
+            Ok(file) => dedup_from_set(&file.path(), &checksums),
+            Err(err) => println!("Error encountered {}", err),
+        }
+    }
 }

@@ -5,3 +5,4 @@ authors = ["Sriharsha Mucheli <harshasrisri@gmail.com>"]
 
 [dependencies]
 md-5 = "0.8.0"
+ignore = "0.4"
