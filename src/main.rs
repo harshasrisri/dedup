@@ -41,8 +41,7 @@ fn md5 (path: &Path) -> Result<String> {
 
 fn remove_file (filepath: &Path) -> Result<()> {
     println!("rm -v {}", &filepath.to_str().unwrap());
-    std::fs::remove_file(filepath)?;
-    Ok(())
+    std::fs::remove_file(filepath)
 }
 
 fn dedup_from_set (filepath : &Path, checksums : &HashSet<String>) {
@@ -62,8 +61,20 @@ fn main() {
 
     assert!(args.len() == 3);
 
-    let remote = File::open(&args[1]).expect("File not found");
+    let remote = match File::open(&args[1]) {
+        Ok(file_handle) => file_handle,
+        Err(_) => {
+            println!("File {} not found", &args[1]);
+            return
+        }
+    };
+
     let local = Path::new(&args[2]);
+
+    if local.exists() == false {
+        println!("Path {} not found", local.to_str().unwrap());
+        return
+    }
 
     let mut checksums = HashSet::new();
 
