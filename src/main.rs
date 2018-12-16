@@ -39,6 +39,12 @@ fn md5 (path: &Path) -> Result<String> {
     bytes2string(&sh.result())
 }
 
+fn remove_file (filepath: &Path) -> Result<()> {
+    println!("rm -v {}", &filepath.to_str().unwrap());
+    std::fs::remove_file(filepath)?;
+    Ok(())
+}
+
 fn dedup_from_set (filepath : &Path, checksums : &HashSet<String>) {
     if filepath.is_dir() == true {
         return;
@@ -47,7 +53,7 @@ fn dedup_from_set (filepath : &Path, checksums : &HashSet<String>) {
     let chksum = md5(&filepath).expect(&format!("Error calculating MD5Sum of {}", &filepath.to_str().unwrap()));
 
     if checksums.contains(&chksum) {
-        println!("rm -v {}", &filepath.to_str().unwrap());
+        let _ = remove_file(filepath);
     }
 }
 
