@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate structopt;
+
 extern crate md5;
 extern crate ignore;
 
@@ -8,6 +11,10 @@ use std::io::{BufRead, BufReader, Read};
 use std::collections::HashSet;
 use md5::{Md5,Digest};
 use ignore::Walk;
+use structopt::StructOpt;
+
+mod args;
+use args::DedupOpts;
 
 const BUFFER_SIZE:usize = 1024;
 
@@ -56,28 +63,25 @@ fn dedup_from_set (filepath : &Path, checksums : &HashSet<String>) {
     }
 }
 
-fn main() {
-    let args : Vec<String> = std::env::args().collect();
+fn main () {
+    let args = DedupOpts::from_args();
+    println!("{:?}", args);
 
-    assert!(args.len() == 3);
-
-    let remote = match File::open(&args[1]) {
-        Ok(file_handle) => file_handle,
-        Err(_) => {
-            println!("File {} not found", &args[1]);
-            return
-        }
-    };
-
-    let local = Path::new(&args[2]);
-
+    let local = &args.local_path;
     if local.exists() == false {
         println!("Path {} not found", local.to_str().unwrap());
         return
     }
 
-    let mut checksums = HashSet::new();
+    let remote = match File::open(&args.remote_list.to_str().unwrap()) {
+        Ok(file_handle) => file_handle,
+        Err(_) => {
+            println!("File {} not found", &&args.remote_list.to_str().unwrap());
+            return
+        }
+    };
 
+    let mut checksums = HashSet::new();
     for line in BufReader::new(remote).lines().filter_map(|result| result.ok()) {
         let hashpath : Vec<&str> = line.splitn(2, ' ').collect();
         checksums.insert(hashpath[0].to_string());
