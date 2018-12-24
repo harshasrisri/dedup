@@ -47,8 +47,12 @@ fn md5 (path: &Path) -> Result<String> {
 }
 
 fn remove_file (filepath: &Path) -> Result<()> {
-    println!("rm -v {}", &filepath.to_str().unwrap());
-    std::fs::remove_file(filepath)
+    if DedupOpts::from_args().commit == true {
+        std::fs::remove_file(filepath)
+    } else {
+        println!("rm -v {}", &filepath.to_str().unwrap());
+        Ok(())
+    }
 }
 
 fn dedup_from_set (filepath : &Path, checksums : &HashSet<String>) {
@@ -69,14 +73,14 @@ fn main () {
 
     let local = &args.local_path;
     if local.exists() == false {
-        println!("Path {} not found", local.to_str().unwrap());
+        println!("Local path not found - {}", local.to_str().unwrap());
         return
     }
 
     let remote = match File::open(&args.remote_list.to_str().unwrap()) {
         Ok(file_handle) => file_handle,
         Err(_) => {
-            println!("File {} not found", &&args.remote_list.to_str().unwrap());
+            println!("Remote list file not found - {}", &&args.remote_list.to_str().unwrap());
             return
         }
     };

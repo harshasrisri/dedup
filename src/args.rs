@@ -17,10 +17,14 @@ pub struct DedupOpts {
     pub remote_list: PathBuf,
 
     /// Local Path containing files that need to be checked for duplicates
-    #[structopt(short = "l", long = "local-path", parse(from_os_str))]
+    #[structopt(short = "l", long = "local-path", parse(from_os_str), default_value = ".")]
     pub local_path: PathBuf,
 
     /// Type of Hashing algorigthm to use for checksumming. Default is Md5
     #[structopt(short = "H", long = "hash-algo", default_value = "Md5")]
     pub hash_algo: String,
+
+    /// Performs a dry run by default. Use this option to commit file deletions
+    #[structopt(short = "c", long = "commit-delete")]
+    pub commit: bool,
 }
