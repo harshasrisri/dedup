@@ -1,6 +1,9 @@
 #[macro_use]
 extern crate structopt;
 extern crate md5;
+extern crate sha1;
+extern crate sha2;
+extern crate digest;
 extern crate ignore;
 
 use std::io::Result;
@@ -45,7 +48,9 @@ fn dedup_from_set (filepath : &Path, checksums : &HashSet<String>) -> u8 {
 
 fn main () {
     let args = DedupOpts::from_args();
-    println!("{:?}", args);
+    if args.debug == true {
+        println!("{:?}", args);
+    }
 
     let local = &args.local_path;
     if local.exists() == false {
