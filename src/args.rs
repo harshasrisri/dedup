@@ -20,7 +20,7 @@ pub struct DedupOpts {
     #[structopt(short = "l", long = "local-path", parse(from_os_str), default_value = ".")]
     pub local_path: PathBuf,
 
-    /// Type of Hashing algorigthm to use for checksumming. Default is Md5
+    /// Type of Hashing algorigthm to use for checksumming.
     #[structopt(short = "H", long = "hash-algo", default_value = "Md5")]
     pub hash_algo: String,
 

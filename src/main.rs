@@ -1,70 +1,46 @@
 #[macro_use]
 extern crate structopt;
-
 extern crate md5;
 extern crate ignore;
 
 use std::io::Result;
 use std::fs::File;
 use std::path::Path;
-use std::io::{BufRead, BufReader, Read};
 use std::collections::HashSet;
-use md5::{Md5,Digest};
-use ignore::Walk;
+use std::io::{BufRead, BufReader};
+use ignore::WalkBuilder;
 use structopt::StructOpt;
 
 mod args;
 use args::DedupOpts;
 
-const BUFFER_SIZE:usize = 1024;
-
-#[test]
-fn test_bytes2string () {
-    assert_eq!(bytes2string(&[1,2,3,4,5,6]).unwrap(), "010203040506".to_string());
-    assert_eq!(bytes2string(&[0xca, 0xfe, 0xba, 0xbe]).unwrap(), "cafebabe".to_string());
-}
-
-fn bytes2string (byte_array: &[u8]) -> Result<String> {
-    let mut ret = String::from("");
-    for byte in byte_array {
-        ret.push_str(&format!("{:02x}", byte));
-    }
-    Ok(ret)
-}
-
-fn md5 (path: &Path) -> Result<String> {
-    let mut sh = Md5::default();
-    let mut file = File::open(&path)?;
-    let mut buffer = [0u8; BUFFER_SIZE];
-    loop {
-        let n = file.read(&mut buffer)?;
-        sh.input(&buffer[..n]);
-        if n == 0 || n < BUFFER_SIZE {
-            break;
-        }
-    }
-    bytes2string(&sh.result())
-}
+mod hash;
+use hash::checksum;
 
 fn remove_file (filepath: &Path) -> Result<()> {
-    if DedupOpts::from_args().commit == true {
-        std::fs::remove_file(filepath)
-    } else {
-        println!("rm -v {}", &filepath.to_str().unwrap());
-        Ok(())
+    if DedupOpts::from_args().verbose > 0 {
+        println!("Removing file {}", &filepath.to_str().unwrap());
     }
+
+    if DedupOpts::from_args().commit == true {
+        std::fs::remove_file(filepath)?;
+    }
+
+    Ok(())
 }
 
-fn dedup_from_set (filepath : &Path, checksums : &HashSet<String>) {
+fn dedup_from_set (filepath : &Path, checksums : &HashSet<String>) -> u8 {
     if filepath.is_dir() == true {
-        return;
+        return 0;
     }
 
-    let chksum = md5(&filepath).expect(&format!("Error calculating MD5Sum of {}", &filepath.to_str().unwrap()));
+    let chksum = checksum(&filepath).expect(&format!("Error calculating checksum of {}", &filepath.to_str().unwrap()));
 
     if checksums.contains(&chksum) {
         let _ = remove_file(filepath);
+        return 1;
     }
+    0
 }
 
 fn main () {
@@ -91,10 +67,14 @@ fn main () {
         checksums.insert(hashpath[0].to_string());
     }
 
-    for filepath in Walk::new(&local) {
+    let mut total_count : usize = 0;
+    let mut dup_count : usize = 0;
+    for filepath in WalkBuilder::new(&local).hidden(false).build() {
+        total_count += 1;
         match filepath {
-            Ok(file) => dedup_from_set(&file.path(), &checksums),
+            Ok(file) => dup_count += dedup_from_set(&file.path(), &checksums) as usize,
             Err(err) => println!("Error encountered {}", err),
         }
     }
+    println!("{} files processed. {} Duplicates found", total_count, dup_count);
 }
