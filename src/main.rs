@@ -46,6 +46,16 @@ fn dedup_from_set (filepath : &Path, checksums : &HashSet<String>) -> u8 {
     0
 }
 
+fn list_file_to_set (filepath : &Path) -> Result<HashSet<String>> {
+    let mut checksums = HashSet::new();
+    let remote = File::open(&filepath.to_str().unwrap())?;
+    for line in BufReader::new(remote).lines().filter_map(|result| result.ok()) {
+        let hashpath : Vec<&str> = line.splitn(2, ' ').collect();
+        checksums.insert(hashpath[0].to_string());
+    }
+    Ok(checksums)
+}
+
 fn main () {
     let args = DedupOpts::from_args();
     if args.debug == true {
@@ -58,19 +68,8 @@ fn main () {
         return
     }
 
-    let remote = match File::open(&args.remote_list.to_str().unwrap()) {
-        Ok(file_handle) => file_handle,
-        Err(_) => {
-            println!("Remote list file not found - {}", &&args.remote_list.to_str().unwrap());
-            return
-        }
-    };
-
-    let mut checksums = HashSet::new();
-    for line in BufReader::new(remote).lines().filter_map(|result| result.ok()) {
-        let hashpath : Vec<&str> = line.splitn(2, ' ').collect();
-        checksums.insert(hashpath[0].to_string());
-    }
+    let checksums = list_file_to_set(&args.remote_list)
+        .expect(&format!("Error processing remote list file {}", &args.remote_list.to_str().unwrap()));
 
     let mut total_count : usize = 0;
     let mut dup_count : usize = 0;
