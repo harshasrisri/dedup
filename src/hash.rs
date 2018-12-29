@@ -10,7 +10,7 @@ use std::io::Result;
 use structopt::StructOpt;
 use args::DedupOpts;
 
-const BUFFER_SIZE:usize = 1024;
+const BUFFER_SIZE:usize = 4096;
 
 #[test]
 fn test_bytes2string () {

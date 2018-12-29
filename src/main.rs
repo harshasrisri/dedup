@@ -87,12 +87,9 @@ fn main () {
 
     let mut total_count : usize = 0;
     let mut dup_count : usize = 0;
-    for filepath in WalkBuilder::new(&local).hidden(false).build() {
-        total_count += 1;
-        match filepath {
-            Ok(file) => dup_count += dedup_from_set(&file.path(), &checksums) as usize,
-            Err(err) => println!("Error encountered {}", err),
-        }
+    for file in WalkBuilder::new(&local).hidden(false).build().filter_map(|x| x.ok()) {
+        if file.path().is_dir() == false { total_count += 1; }
+        dup_count += dedup_from_set(&file.path(), &checksums) as usize;
     }
     println!("{} files processed. {} Duplicates found", total_count, dup_count);
 }

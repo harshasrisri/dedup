@@ -1,8 +1,6 @@
 use std::path::PathBuf;
 
-/// Program to find duplicate files and take care of them
 #[derive(StructOpt, Debug)]
-#[structopt(name = "dedup")]
 pub struct DedupOpts {
     /// Activate debug mode
     #[structopt(short = "d", long = "debug")]

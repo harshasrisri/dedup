@@ -1,6 +1,6 @@
 [package]
 name = "dedup"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Sriharsha Mucheli <harshasrisri@gmail.com>"]
 description = "Program to find duplicate files and take care of them"
 

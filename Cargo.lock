@@ -133,7 +133,7 @@ dependencies = [
 
 [[package]]
 name = "dedup"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "digest 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ignore 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
