@@ -27,6 +27,6 @@ pub struct DedupOpts {
     pub hash_algo: String,
 
     /// Performs a dry run by default. Use this option to commit file deletions
-    #[structopt(short = "c", long = "commit-delete")]
+    #[structopt(short = "c", long = "commit")]
     pub commit: bool,
 }

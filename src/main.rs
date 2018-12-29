@@ -22,7 +22,7 @@ use hash::checksum;
 
 fn remove_file (filepath: &Path) -> Result<()> {
     if DedupOpts::from_args().verbose > 0 {
-        println!("Removing file {}", &filepath.to_str().unwrap());
+        println!("{}", &filepath.to_str().unwrap());
     }
 
     if DedupOpts::from_args().commit == true {
@@ -91,5 +91,6 @@ fn main () {
         if file.path().is_dir() == false { total_count += 1; }
         dup_count += dedup_from_set(&file.path(), &checksums) as usize;
     }
-    println!("{} files processed. {} Duplicates found", total_count, dup_count);
+    println!("{} files processed. {} Duplicates {}", total_count, dup_count, 
+             match args.commit {true => "deleted".to_string(), false => "found".to_string()} );
 }
