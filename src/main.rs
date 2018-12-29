@@ -56,6 +56,16 @@ fn list_file_to_set (filepath : &Path) -> Result<HashSet<String>> {
     Ok(checksums)
 }
 
+fn remote_dir_to_set (dirpath : &Path) -> Result<HashSet<String>> {
+    let mut checksums = HashSet::new();
+    for path in WalkBuilder::new(&dirpath).hidden(false).build().filter_map(|x| x.ok()) {
+        if path.path().is_dir() == false {
+            checksums.insert(checksum(&path.path())?);
+        }
+    }
+    Ok(checksums)
+}
+
 fn main () {
     let args = DedupOpts::from_args();
     if args.debug == true {
@@ -68,8 +78,12 @@ fn main () {
         return
     }
 
-    let checksums = list_file_to_set(&args.remote_list)
-        .expect(&format!("Error processing remote list file {}", &args.remote_list.to_str().unwrap()));
+    let checksums = match (&args.remote_list, &args.remote_path) {
+        (Some(_),    Some(_)   ) => panic!("StructOpt option parsing should have prevented this"),
+        (Some(list), None      ) => list_file_to_set(list),
+        (None,       Some(path)) => remote_dir_to_set(path),
+        (None,       None      ) => panic!("Must specify either -r or -R"),
+    }.expect("Error processing remotes");
 
     let mut total_count : usize = 0;
     let mut dup_count : usize = 0;
