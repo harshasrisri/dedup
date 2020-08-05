@@ -3,6 +3,7 @@ name = "dedup"
 version = "0.2.0"
 authors = ["Sriharsha Mucheli <harshasrisri@gmail.com>"]
 description = "Program to find duplicate files and take care of them"
+edition = "2018"
 
 [dependencies]
 md-5 = "0.8"

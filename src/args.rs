@@ -11,15 +11,30 @@ pub struct DedupOpts {
     pub verbose: u8,
 
     /// File containing list of remote files and hashes
-    #[structopt(short = "R", long = "remote-list", parse(from_os_str), conflicts_with = "remote_path")]
+    #[structopt(
+        short = "R",
+        long = "remote-list",
+        parse(from_os_str),
+        conflicts_with = "remote_path"
+    )]
     pub remote_list: Option<PathBuf>,
 
     /// Remote path to use as a reference to filter duplicates in local
-    #[structopt(short = "r", long = "remote-path", parse(from_os_str), required_unless = "remote_list")]
+    #[structopt(
+        short = "r",
+        long = "remote-path",
+        parse(from_os_str),
+        required_unless = "remote_list"
+    )]
     pub remote_path: Option<PathBuf>,
 
     /// Local Path containing files that need to be checked for duplicates
-    #[structopt(short = "l", long = "local-path", parse(from_os_str), default_value = ".")]
+    #[structopt(
+        short = "l",
+        long = "local-path",
+        parse(from_os_str),
+        default_value = "."
+    )]
     pub local_path: PathBuf,
 
     /// Type of Hashing algorigthm to use for checksumming.
