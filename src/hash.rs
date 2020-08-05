@@ -1,14 +1,14 @@
-use crate::args::DedupOpts;
-use digest::Digest;
 use md5::Md5;
 use sha1::Sha1;
 use sha2::Sha256;
 use sha2::Sha512;
 use std::fs::File;
-use std::io::Read;
-use std::io::Result;
-use std::path::Path;
-use structopt::StructOpt;
+use digest::Digest;
+use walkdir::WalkDir;
+use crate::args::CLI_OPTS;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use std::io::{BufRead, BufReader, Read, Result};
 
 const BUFFER_SIZE: usize = 4096;
 
@@ -47,7 +47,7 @@ fn hash_algo<D: Digest>(path: &Path) -> Result<String> {
 }
 
 pub fn checksum(path: &Path) -> Result<String> {
-    let algo = &DedupOpts::from_args().hash_algo as &str;
+    let algo = &CLI_OPTS.hash_algo as &str;
     match algo {
         "MD5" | "Md5" | "md5" => hash_algo::<Md5>(path),
         "SHA128" | "Sha128" | "sha128" => hash_algo::<Sha1>(path),
@@ -55,4 +55,86 @@ pub fn checksum(path: &Path) -> Result<String> {
         "SHA512" | "Sha512" | "sha512" => hash_algo::<Sha512>(path),
         _ => panic!("Unsupported hash algorithm - {}", algo),
     }
+}
+
+fn remove_file(filepath: &Path) -> Result<()> {
+    if CLI_OPTS.verbose > 0 {
+        println!("{}", &filepath.to_str().unwrap());
+    }
+
+    if CLI_OPTS.commit {
+        std::fs::remove_file(filepath)?;
+    }
+
+    Ok(())
+}
+
+fn dedup_from_set(filepath: &Path, checksums: &HashSet<String>) -> bool {
+    match checksum(&filepath) {
+        Ok(chksum) => {
+            if checksums.contains(&chksum) {
+                let _ = remove_file(filepath);
+                true
+            } else {
+                false
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "Skipping {} - {}",
+                &filepath.to_str().unwrap(),
+                e.to_string()
+            );
+            false
+        }
+    }
+}
+
+fn list_file_to_set(filepath: &PathBuf) -> Result<HashSet<String>> {
+    let mut checksums = HashSet::new();
+    let remote: Box<dyn std::io::Read> = match filepath.to_str().unwrap() {
+        "-" => Box::new(std::io::stdin()),
+        _ => Box::new(File::open(&filepath.to_str().unwrap())?),
+    };
+    for line in BufReader::new(remote)
+        .lines()
+        .filter_map(|result| result.ok())
+    {
+        let hashpath: Vec<&str> = line.splitn(2, ' ').collect();
+        checksums.insert(hashpath[0].to_string());
+    }
+    Ok(checksums)
+}
+
+pub fn hash_mode(list: &PathBuf) {
+    let mut total_count: usize = 0;
+    let mut dup_count: usize = 0;
+
+    let local = &CLI_OPTS.local_path;
+    if !local.exists() {
+        println!("Local path not found - {}", local.to_str().unwrap());
+        return;
+    }
+    let checksums = list_file_to_set(&list).expect("Failed to parse remote list");
+
+    for file in WalkDir::new(&local)
+    {
+        let file = file.unwrap();
+        if file.path().is_dir() {
+            continue;
+        }
+        total_count += 1;
+        dup_count += dedup_from_set(&file.path(), &checksums) as usize;
+    }
+
+    println!(
+        "{} files processed. {} Duplicates {}",
+        total_count,
+        dup_count,
+        if CLI_OPTS.commit {
+            "deleted".to_string()
+        } else {
+            "found".to_string()
+        }
+    );
 }
