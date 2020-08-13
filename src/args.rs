@@ -1,6 +1,6 @@
+use lazy_static::lazy_static;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use lazy_static::lazy_static;
 
 #[derive(StructOpt, Debug)]
 pub struct DedupOpts {
@@ -52,4 +52,3 @@ lazy_static! {
     #[derive(Debug)]
     pub static ref CLI_OPTS: DedupOpts = DedupOpts::from_args();
 }
-

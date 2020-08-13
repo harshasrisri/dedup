@@ -1,14 +1,14 @@
+use crate::args::CLI_OPTS;
+use digest::Digest;
 use md5::Md5;
 use sha1::Sha1;
 use sha2::Sha256;
 use sha2::Sha512;
-use std::fs::File;
-use digest::Digest;
-use walkdir::WalkDir;
-use crate::args::CLI_OPTS;
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Result};
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 const BUFFER_SIZE: usize = 4096;
 
@@ -117,8 +117,7 @@ pub fn hash_mode(list: &PathBuf) {
     }
     let checksums = list_file_to_set(&list).expect("Failed to parse remote list");
 
-    for file in WalkDir::new(&local)
-    {
+    for file in WalkDir::new(&local) {
         let file = file.unwrap();
         if file.path().is_dir() {
             continue;
