@@ -17,7 +17,8 @@ pub struct DedupOpts {
         short = "R",
         long = "remote-list",
         parse(from_os_str),
-        conflicts_with = "remote_path"
+        conflicts_with = "remote_path",
+        requires = "hash"
     )]
     pub remote_list: Option<PathBuf>,
 
@@ -26,7 +27,7 @@ pub struct DedupOpts {
         short = "r",
         long = "remote-path",
         parse(from_os_str),
-        required_unless = "remote_list"
+        conflicts_with = "remote_list"
     )]
     pub remote_path: Option<PathBuf>,
 
@@ -40,8 +41,8 @@ pub struct DedupOpts {
     pub local_path: PathBuf,
 
     /// Type of Hashing algorigthm to use for checksumming.
-    #[structopt(short = "H", long, default_value = "Md5", requires = "remote_list")]
-    pub hash: String,
+    #[structopt(short = "H", long, requires = "remote_list")]
+    pub hash: Option<String>,
 
     /// Performs a dry run by default. Use this option to commit file deletions
     #[structopt(short, long)]

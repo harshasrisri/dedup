@@ -14,7 +14,10 @@ fn main() {
         return;
     }
 
-    let remote_path = CLI_OPTS.remote_path.as_ref().expect("Expected a remote path CLI option");
+    let remote_path = CLI_OPTS
+        .remote_path
+        .as_ref()
+        .expect("Expected a remote path CLI option");
 
     if std::fs::canonicalize(remote_path).unwrap()
         == std::fs::canonicalize(&CLI_OPTS.local_path).unwrap()

@@ -36,8 +36,11 @@ fn hash_algo<D: Digest>(path: &Path) -> Result<String> {
 }
 
 pub fn checksum(path: &Path) -> Result<String> {
-    let algo = &CLI_OPTS.hash as &str;
-    match algo {
+    let algo = CLI_OPTS
+        .hash
+        .as_ref()
+        .expect("Hash algo should have been set");
+    match algo.as_str() {
         "MD5" | "Md5" | "md5" => hash_algo::<Md5>(path),
         "SHA128" | "Sha128" | "sha128" => hash_algo::<Sha1>(path),
         "SHA256" | "Sha256" | "sha256" => hash_algo::<Sha256>(path),
@@ -72,13 +75,12 @@ fn list_file_to_set(filepath: &PathBuf) -> Result<HashSet<String>> {
         "-" => Box::new(std::io::stdin()),
         _ => Box::new(File::open(&filepath.to_str().unwrap())?),
     };
-    Ok( BufReader::new(remote)
+    Ok(BufReader::new(remote)
         .lines()
         .filter_map(|result| result.ok())
         .filter_map(|line| line.split(' ').nth(0).map(|slice| slice.to_string()))
         .map(|hash| hash.to_owned())
-        .collect()
-      )
+        .collect())
 }
 
 pub fn hash_mode(list: &PathBuf) {
