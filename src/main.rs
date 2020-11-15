@@ -26,4 +26,6 @@ fn main() {
         );
         return;
     }
+
+    return size::size_mode().expect("Shouldn't have come to this");
 }
