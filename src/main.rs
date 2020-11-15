@@ -1,5 +1,7 @@
 mod args;
+mod file;
 mod hash;
+mod size;
 use args::CLI_OPTS;
 
 fn main() {
@@ -7,14 +9,21 @@ fn main() {
         println!("{:?}", CLI_OPTS);
     }
 
-    let _remote_path;
-    match (&CLI_OPTS.remote_list, &CLI_OPTS.remote_path) {
-        (Some(_), Some(_)) => panic!("StructOpt option parsing should have prevented this"),
-        (Some(list), None) => {
-            hash::hash_mode(list);
-            return;
-        }
-        (None, Some(path)) => _remote_path = path,
-        (None, None) => panic!("Must specify either -r or -R"),
-    };
+    if let Some(remote_list) = &CLI_OPTS.remote_list {
+        hash::hash_mode(remote_list);
+        return;
+    }
+
+    let remote_path = CLI_OPTS.remote_path.as_ref().expect("Expected a remote path CLI option");
+
+    if std::fs::canonicalize(remote_path).unwrap()
+        == std::fs::canonicalize(&CLI_OPTS.local_path).unwrap()
+    {
+        eprintln!(
+            "In-place deduplication not yet supported. {} and {} are the same path.",
+            remote_path.display(),
+            CLI_OPTS.local_path.display()
+        );
+        return;
+    }
 }

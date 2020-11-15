@@ -1,4 +1,5 @@
 use crate::args::CLI_OPTS;
+use crate::file::remove_file;
 use digest::Digest;
 use md5::Md5;
 use sha1::Sha1;
@@ -12,19 +13,7 @@ use walkdir::WalkDir;
 
 const BUFFER_SIZE: usize = 4096;
 
-#[test]
-fn test_bytes2string() {
-    assert_eq!(
-        bytes2string(&[1, 2, 3, 4, 5, 6]).unwrap(),
-        "010203040506".to_string()
-    );
-    assert_eq!(
-        bytes2string(&[0xca, 0xfe, 0xba, 0xbe]).unwrap(),
-        "cafebabe".to_string()
-    );
-}
-
-fn bytes2string(byte_array: &[u8]) -> Result<String> {
+pub fn bytes2string(byte_array: &[u8]) -> Result<String> {
     let mut ret = String::from("");
     for byte in byte_array {
         ret.push_str(&format!("{:02x}", byte));
@@ -47,7 +36,7 @@ fn hash_algo<D: Digest>(path: &Path) -> Result<String> {
 }
 
 pub fn checksum(path: &Path) -> Result<String> {
-    let algo = &CLI_OPTS.hash_algo as &str;
+    let algo = &CLI_OPTS.hash as &str;
     match algo {
         "MD5" | "Md5" | "md5" => hash_algo::<Md5>(path),
         "SHA128" | "Sha128" | "sha128" => hash_algo::<Sha1>(path),
@@ -55,18 +44,6 @@ pub fn checksum(path: &Path) -> Result<String> {
         "SHA512" | "Sha512" | "sha512" => hash_algo::<Sha512>(path),
         _ => panic!("Unsupported hash algorithm - {}", algo),
     }
-}
-
-fn remove_file(filepath: &Path) -> Result<()> {
-    if CLI_OPTS.verbose > 0 {
-        println!("{}", &filepath.to_str().unwrap());
-    }
-
-    if CLI_OPTS.commit {
-        std::fs::remove_file(filepath)?;
-    }
-
-    Ok(())
 }
 
 fn dedup_from_set(filepath: &Path, checksums: &HashSet<String>) -> bool {
@@ -91,19 +68,17 @@ fn dedup_from_set(filepath: &Path, checksums: &HashSet<String>) -> bool {
 }
 
 fn list_file_to_set(filepath: &PathBuf) -> Result<HashSet<String>> {
-    let mut checksums = HashSet::new();
     let remote: Box<dyn std::io::Read> = match filepath.to_str().unwrap() {
         "-" => Box::new(std::io::stdin()),
         _ => Box::new(File::open(&filepath.to_str().unwrap())?),
     };
-    for line in BufReader::new(remote)
+    Ok( BufReader::new(remote)
         .lines()
         .filter_map(|result| result.ok())
-    {
-        let hashpath: Vec<&str> = line.splitn(2, ' ').collect();
-        checksums.insert(hashpath[0].to_string());
-    }
-    Ok(checksums)
+        .filter_map(|line| line.split(' ').nth(0).map(|slice| slice.to_string()))
+        .map(|hash| hash.to_owned())
+        .collect()
+      )
 }
 
 pub fn hash_mode(list: &PathBuf) {
