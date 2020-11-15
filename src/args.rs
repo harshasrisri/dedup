@@ -5,11 +5,11 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 pub struct DedupOpts {
     /// Activate debug mode
-    #[structopt(short = "d", long = "debug")]
+    #[structopt(short, long)]
     pub debug: bool,
 
     /// Verbose mode (-v, -vv, -vvv, etc.)
-    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
+    #[structopt(short, long, parse(from_occurrences))]
     pub verbose: u8,
 
     /// File containing list of remote files and hashes
@@ -40,11 +40,11 @@ pub struct DedupOpts {
     pub local_path: PathBuf,
 
     /// Type of Hashing algorigthm to use for checksumming.
-    #[structopt(short = "H", long = "hash-algo", default_value = "Md5")]
-    pub hash_algo: String,
+    #[structopt(short = "H", long, default_value = "Md5", requires = "remote_list")]
+    pub hash: String,
 
     /// Performs a dry run by default. Use this option to commit file deletions
-    #[structopt(short = "c", long = "commit")]
+    #[structopt(short, long)]
     pub commit: bool,
 }
 
