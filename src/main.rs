@@ -3,15 +3,15 @@ mod file;
 mod hash;
 mod size;
 use args::CLI_OPTS;
+use anyhow::Result;
 
-fn main() {
+fn main() -> Result<()> {
     if CLI_OPTS.debug {
         println!("{:?}", CLI_OPTS);
     }
 
     if let Some(remote_list) = &CLI_OPTS.remote_list {
-        hash::hash_mode(remote_list);
-        return;
+        return hash::hash_mode(remote_list);
     }
 
     let remote_path = CLI_OPTS
@@ -22,13 +22,12 @@ fn main() {
     if std::fs::canonicalize(remote_path).unwrap()
         == std::fs::canonicalize(&CLI_OPTS.local_path).unwrap()
     {
-        eprintln!(
+        anyhow::bail!(
             "In-place deduplication not yet supported. {} and {} are the same path.",
             remote_path.display(),
             CLI_OPTS.local_path.display()
         );
-        return;
     }
 
-    return size::size_mode().expect("Shouldn't have come to this");
+    size::size_mode()
 }

@@ -1,5 +1,5 @@
 use crate::args::CLI_OPTS;
-use crate::file::remove_file;
+use crate::file::FileOps;
 use digest::Digest;
 use md5::Md5;
 use sha1::Sha1;
@@ -7,9 +7,10 @@ use sha2::Sha256;
 use sha2::Sha512;
 use std::collections::HashSet;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read, Result};
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+use anyhow::Result;
 
 const BUFFER_SIZE: usize = 4096;
 
@@ -21,7 +22,7 @@ pub fn bytes2string(byte_array: &[u8]) -> Result<String> {
     Ok(ret)
 }
 
-fn hash_algo<D: Digest>(path: &Path) -> Result<String> {
+fn file_hash<D: Digest>(path: &Path) -> Result<String> {
     let mut sh = D::new();
     let mut file = File::open(&path)?;
     let mut buffer = [0u8; BUFFER_SIZE];
@@ -41,22 +42,22 @@ pub fn checksum(path: &Path) -> Result<String> {
         .as_ref()
         .expect("Hash algo should have been set");
     match algo.as_str() {
-        "MD5" | "Md5" | "md5" => hash_algo::<Md5>(path),
-        "SHA128" | "Sha128" | "sha128" => hash_algo::<Sha1>(path),
-        "SHA256" | "Sha256" | "sha256" => hash_algo::<Sha256>(path),
-        "SHA512" | "Sha512" | "sha512" => hash_algo::<Sha512>(path),
+        "MD5" | "Md5" | "md5" => file_hash::<Md5>(path),
+        "SHA128" | "Sha128" | "sha128" => file_hash::<Sha1>(path),
+        "SHA256" | "Sha256" | "sha256" => file_hash::<Sha256>(path),
+        "SHA512" | "Sha512" | "sha512" => file_hash::<Sha512>(path),
         _ => panic!("Unsupported hash algorithm - {}", algo),
     }
 }
 
-fn dedup_from_set(filepath: &Path, checksums: &HashSet<String>) -> bool {
+fn dedup_from_set(filepath: &Path, checksums: &HashSet<String>) -> Result<bool> {
     match checksum(&filepath) {
         Ok(chksum) => {
             if checksums.contains(&chksum) {
-                let _ = remove_file(filepath);
-                true
+                filepath.remove_file()?;
+                Ok(true)
             } else {
-                false
+                Ok(false)
             }
         }
         Err(e) => {
@@ -65,7 +66,7 @@ fn dedup_from_set(filepath: &Path, checksums: &HashSet<String>) -> bool {
                 &filepath.to_str().unwrap(),
                 e.to_string()
             );
-            false
+            Ok(false)
         }
     }
 }
@@ -83,14 +84,13 @@ fn list_file_to_set(filepath: &PathBuf) -> Result<HashSet<String>> {
         .collect())
 }
 
-pub fn hash_mode(list: &PathBuf) {
+pub fn hash_mode(list: &PathBuf) -> Result<()> {
     let mut total_count: usize = 0;
     let mut dup_count: usize = 0;
 
     let local = &CLI_OPTS.local_path;
     if !local.exists() {
-        println!("Local path not found - {}", local.to_str().unwrap());
-        return;
+        anyhow::bail!("Local path not found - {}", local.to_str().unwrap());
     }
     let checksums = list_file_to_set(&list).expect("Failed to parse remote list");
 
@@ -100,7 +100,7 @@ pub fn hash_mode(list: &PathBuf) {
             continue;
         }
         total_count += 1;
-        dup_count += dedup_from_set(&file.path(), &checksums) as usize;
+        dup_count += dedup_from_set(&file.path(), &checksums)? as usize;
     }
 
     println!(
@@ -113,4 +113,5 @@ pub fn hash_mode(list: &PathBuf) {
             "found".to_string()
         }
     );
+    Ok(())
 }
