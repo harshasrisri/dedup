@@ -1,40 +1,15 @@
 use crate::args::CLI_OPTS;
 use crate::file::FileOps;
-use digest::Digest;
 use md5::Md5;
 use sha1::Sha1;
 use sha2::Sha256;
 use sha2::Sha512;
 use std::collections::HashSet;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use anyhow::Result;
-
-const BUFFER_SIZE: usize = 4096;
-
-pub fn bytes2string(byte_array: &[u8]) -> Result<String> {
-    let mut ret = String::from("");
-    for byte in byte_array {
-        ret.push_str(&format!("{:02x}", byte));
-    }
-    Ok(ret)
-}
-
-fn file_hash<D: Digest>(path: &Path) -> Result<String> {
-    let mut sh = D::new();
-    let mut file = File::open(&path)?;
-    let mut buffer = [0u8; BUFFER_SIZE];
-    loop {
-        let n = file.read(&mut buffer)?;
-        sh.input(&buffer[..n]);
-        if n == 0 || n < BUFFER_SIZE {
-            break;
-        }
-    }
-    bytes2string(&sh.result())
-}
 
 pub fn checksum(path: &Path) -> Result<String> {
     let algo = CLI_OPTS
@@ -42,10 +17,10 @@ pub fn checksum(path: &Path) -> Result<String> {
         .as_ref()
         .expect("Hash algo should have been set");
     match algo.as_str() {
-        "MD5" | "Md5" | "md5" => file_hash::<Md5>(path),
-        "SHA128" | "Sha128" | "sha128" => file_hash::<Sha1>(path),
-        "SHA256" | "Sha256" | "sha256" => file_hash::<Sha256>(path),
-        "SHA512" | "Sha512" | "sha512" => file_hash::<Sha512>(path),
+        "MD5" | "Md5" | "md5" => path.content_checksum::<Md5>(),
+        "SHA128" | "Sha128" | "sha128" => path.content_checksum::<Sha1>(),
+        "SHA256" | "Sha256" | "sha256" => path.content_checksum::<Sha256>(),
+        "SHA512" | "Sha512" | "sha512" => path.content_checksum::<Sha512>(),
         _ => panic!("Unsupported hash algorithm - {}", algo),
     }
 }

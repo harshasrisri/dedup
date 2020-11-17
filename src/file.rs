@@ -3,10 +3,22 @@ use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::Path;
 use anyhow::Result;
+use digest::Digest;
+
+const CHUNK_SIZE: usize = 4096;
+
+pub fn bytes2string(byte_array: &[u8]) -> Result<String> {
+    let mut ret = String::from("");
+    for byte in byte_array {
+        ret.push_str(&format!("{:02x}", byte));
+    }
+    Ok(ret)
+}
 
 pub trait FileOps : AsRef<Path> {
     fn remove_file(&self) -> Result<()>;
     fn content_equals(&self, other: &Self) -> Result<bool>;
+    fn content_checksum<D: Digest>(&self) -> Result<String>;
 }
 
 impl<P> FileOps for P
@@ -26,7 +38,6 @@ where
     }
 
     fn content_equals(&self, other: &Self) -> Result<bool> {
-        const CHUNK_SIZE: usize = 4096;
         let mut src = OpenOptions::new()
             .read(true)
             .write(false)
@@ -58,7 +69,22 @@ where
             }
         }
     }
-}
 
-// pub fn files_are_equal(src: &PathBuf, tgt: &PathBuf) -> Result<bool> {
-// }
+    fn content_checksum<D: Digest>(&self) -> Result<String> {
+        let mut sh = D::new();
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(false)
+            .create(false)
+            .open(self)?;
+        let mut buffer = [0u8; CHUNK_SIZE];
+        loop {
+            let n = file.read(&mut buffer)?;
+            sh.input(&buffer[..n]);
+            if n == 0 || n < CHUNK_SIZE {
+                break;
+            }
+        }
+        bytes2string(&sh.result())
+    }
+}
