@@ -1,30 +1,38 @@
 use crate::args::CLI_OPTS;
-use std::fs::OpenOptions;
-use std::io::Read;
-use std::path::Path;
 use anyhow::Result;
 use digest::Digest;
+use std::fs::{File, OpenOptions};
+use std::io::Read;
+use std::path::Path;
 
 const CHUNK_SIZE: usize = 4096;
 
-pub fn bytes2string(byte_array: &[u8]) -> Result<String> {
-    let mut ret = String::from("");
-    for byte in byte_array {
-        ret.push_str(&format!("{:02x}", byte));
-    }
-    Ok(ret)
+pub fn bytes2string(byte_array: &[u8]) -> String {
+    byte_array
+        .iter()
+        .map(|byte| format!("{:02x}", byte))
+        .collect()
 }
 
-pub trait FileOps : AsRef<Path> {
+pub trait FileOps: AsRef<Path> {
     fn remove_file(&self) -> Result<()>;
     fn content_equals(&self, other: &Self) -> Result<bool>;
     fn content_checksum<D: Digest>(&self) -> Result<String>;
+    fn open_ro(&self) -> Result<File>;
 }
 
 impl<P> FileOps for P
 where
     P: AsRef<Path> + ?Sized,
 {
+    fn open_ro(&self) -> Result<File> {
+        Ok(OpenOptions::new()
+            .read(true)
+            .write(false)
+            .create(false)
+            .open(self)?)
+    }
+
     fn remove_file(&self) -> Result<()> {
         if CLI_OPTS.verbose > 0 {
             println!("{}", &self.as_ref().to_str().unwrap());
@@ -38,16 +46,8 @@ where
     }
 
     fn content_equals(&self, other: &Self) -> Result<bool> {
-        let mut src = OpenOptions::new()
-            .read(true)
-            .write(false)
-            .create(false)
-            .open(self)?;
-        let mut tgt = OpenOptions::new()
-            .read(true)
-            .write(false)
-            .create(false)
-            .open(other)?;
+        let mut src = self.open_ro()?;
+        let mut tgt = other.open_ro()?;
         let mut src_buf = Vec::with_capacity(CHUNK_SIZE);
         let mut tgt_buf = Vec::with_capacity(CHUNK_SIZE);
 
@@ -72,11 +72,7 @@ where
 
     fn content_checksum<D: Digest>(&self) -> Result<String> {
         let mut sh = D::new();
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(false)
-            .create(false)
-            .open(self)?;
+        let mut file = self.open_ro()?;
         let mut buffer = [0u8; CHUNK_SIZE];
         loop {
             let n = file.read(&mut buffer)?;
@@ -85,6 +81,6 @@ where
                 break;
             }
         }
-        bytes2string(&sh.result())
+        Ok(bytes2string(&sh.result()))
     }
 }

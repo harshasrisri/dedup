@@ -2,8 +2,8 @@ mod args;
 mod file;
 mod hash;
 mod size;
-use args::CLI_OPTS;
 use anyhow::Result;
+use args::CLI_OPTS;
 
 fn main() -> Result<()> {
     if CLI_OPTS.debug {

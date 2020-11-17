@@ -1,15 +1,15 @@
 use crate::args::CLI_OPTS;
 use crate::file::FileOps;
+use anyhow::Result;
 use std::collections::HashMap;
 use std::fs::metadata;
 use walkdir::WalkDir;
-use anyhow::Result;
 
 pub fn size_mode() -> Result<()> {
     let ref local_path = CLI_OPTS.local_path;
     let ref remote_path = CLI_OPTS.remote_path.as_ref().expect("Remote Path is None");
     let mut file_map = HashMap::new();
-    let ( mut processed, mut duplicates ) = (0, 0);
+    let (mut processed, mut duplicates) = (0, 0);
 
     for file in WalkDir::new(remote_path) {
         let path = file?.into_path();
