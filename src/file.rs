@@ -14,27 +14,36 @@ pub fn bytes2string(byte_array: &[u8]) -> String {
         .collect()
 }
 
-// pub struct BufChunkIterator<R: Read> {
-//     inner: BufReader<R>,
-// }
+pub struct BufChunkIterator<R: Read> {
+    inner: R,
+    buffer: Vec<u8>,
+}
 
-// impl<R: Read> Iterator for BufChunkIterator<R> {
-//     type Item = Vec<u8>;
+impl<R: Read> Iterator for BufChunkIterator<R> {
+    type Item = Vec<u8>;
 
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let ret = self.inner.fill_buf().map(|slice| slice.to_owned()).ok();
-//         println!("{:#?}", ret);
-//         ret.iter().for_each(|buf| self.inner.consume(buf.len()));
-//         ret
-//     }
-// }
+    fn next(&mut self) -> Option<Self::Item> {
+        let cs = self.buffer.capacity();
+        self.buffer.clear();
+        let len = self.inner
+            .by_ref()
+            .take(cs as u64)
+            .read_to_end(&mut self.buffer)
+            .ok();
+        if len != Some(0) {
+            len.map(|len| self.buffer[..len].to_owned())
+        } else {
+            None
+        }
+    }
+}
 
 pub trait FileOps: AsRef<Path> {
     fn remove_file(&self) -> Result<()>;
     fn content_equals(&self, other: &Self) -> Result<bool>;
     fn content_checksum<D: Digest>(&self) -> Result<String>;
     fn open_ro(&self) -> Result<File>;
-    // fn chunks(&self, chunk_size: usize) -> Result<BufChunkIterator<File>>;
+    fn chunks(&self, chunk_size: usize) -> Result<BufChunkIterator<File>>;
 }
 
 impl<P> FileOps for P
@@ -61,64 +70,26 @@ where
         Ok(())
     }
 
-    // fn content_equals(&self, other: &Self) -> Result<bool> {
-    //     Ok(
-    //         self.chunks(CHUNK_SIZE)?.into_iter()
-    //         .zip(other.chunks(CHUNK_SIZE)?.into_iter())
-    //         .all(|(c1, c2)| c1 == c2)
-    //       )
-    // }
-
-    // fn content_checksum<D: Digest>(&self) -> Result<String> {
-    //     let mut sh = D::new();
-    //     self.chunks(CHUNK_SIZE)?.into_iter().for_each(|chunk| sh.input(chunk));
-    //     Ok(bytes2string(&sh.result()))
-    // }
-
     fn content_equals(&self, other: &Self) -> Result<bool> {
-        let mut src = self.open_ro()?;
-        let mut tgt = other.open_ro()?;
-        let mut src_buf = Vec::with_capacity(CHUNK_SIZE);
-        let mut tgt_buf = Vec::with_capacity(CHUNK_SIZE);
-
-        loop {
-            src_buf.clear();
-            tgt_buf.clear();
-            let src_len = src
-                .by_ref()
-                .take(CHUNK_SIZE as u64)
-                .read_to_end(&mut src_buf)?;
-            let tgt_len = tgt
-                .by_ref()
-                .take(CHUNK_SIZE as u64)
-                .read_to_end(&mut tgt_buf)?;
-            if src_len == 0 && tgt_len == 0 {
-                return Ok(true);
-            } else if src_len != tgt_len || src_buf != tgt_buf {
-                return Ok(false);
-            }
-        }
+        Ok(self
+            .chunks(CHUNK_SIZE)?
+            .into_iter()
+            .zip(other.chunks(CHUNK_SIZE)?.into_iter())
+            .all(|(c1, c2)| c1 == c2))
     }
 
     fn content_checksum<D: Digest>(&self) -> Result<String> {
         let mut sh = D::new();
-        let mut file = self.open_ro()?;
-        let mut buffer = [0u8; CHUNK_SIZE];
-        loop {
-            let n = file.read(&mut buffer)?;
-            sh.input(&buffer[..n]);
-            if n == 0 || n < CHUNK_SIZE {
-                break;
-            }
-        }
+        self.chunks(CHUNK_SIZE)?
+            .into_iter()
+            .for_each(|chunk| sh.input(chunk));
         Ok(bytes2string(&sh.result()))
     }
 
-    // fn chunks(&self, chunk_size: usize) -> Result<BufChunkIterator<File>> {
-    //     Ok(
-    //         BufChunkIterator {
-    //             inner: BufReader::with_capacity(chunk_size, self.open_ro()?)
-    //         }
-    //       )
-    // }
+    fn chunks(&self, chunk_size: usize) -> Result<BufChunkIterator<File>> {
+        Ok(BufChunkIterator {
+            inner: self.open_ro()?,
+            buffer: Vec::with_capacity(chunk_size),
+        })
+    }
 }
