@@ -1,7 +1,6 @@
 mod args;
 mod file;
-mod hash;
-mod size;
+mod modes;
 use anyhow::Result;
 use args::CLI_OPTS;
 
@@ -11,7 +10,7 @@ fn main() -> Result<()> {
     }
 
     if let Some(remote_list) = &CLI_OPTS.remote_list {
-        return hash::hash_mode(remote_list);
+        return modes::hash_mode(remote_list);
     }
 
     let remote_path = CLI_OPTS
@@ -29,5 +28,5 @@ fn main() -> Result<()> {
         );
     }
 
-    size::size_mode()
+    modes::size_mode()
 }
