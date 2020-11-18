@@ -14,11 +14,27 @@ pub fn bytes2string(byte_array: &[u8]) -> String {
         .collect()
 }
 
+// pub struct BufChunkIterator<R: Read> {
+//     inner: BufReader<R>,
+// }
+
+// impl<R: Read> Iterator for BufChunkIterator<R> {
+//     type Item = Vec<u8>;
+
+//     fn next(&mut self) -> Option<Self::Item> {
+//         let ret = self.inner.fill_buf().map(|slice| slice.to_owned()).ok();
+//         println!("{:#?}", ret);
+//         ret.iter().for_each(|buf| self.inner.consume(buf.len()));
+//         ret
+//     }
+// }
+
 pub trait FileOps: AsRef<Path> {
     fn remove_file(&self) -> Result<()>;
     fn content_equals(&self, other: &Self) -> Result<bool>;
     fn content_checksum<D: Digest>(&self) -> Result<String>;
     fn open_ro(&self) -> Result<File>;
+    // fn chunks(&self, chunk_size: usize) -> Result<BufChunkIterator<File>>;
 }
 
 impl<P> FileOps for P
@@ -44,6 +60,20 @@ where
 
         Ok(())
     }
+
+    // fn content_equals(&self, other: &Self) -> Result<bool> {
+    //     Ok(
+    //         self.chunks(CHUNK_SIZE)?.into_iter()
+    //         .zip(other.chunks(CHUNK_SIZE)?.into_iter())
+    //         .all(|(c1, c2)| c1 == c2)
+    //       )
+    // }
+
+    // fn content_checksum<D: Digest>(&self) -> Result<String> {
+    //     let mut sh = D::new();
+    //     self.chunks(CHUNK_SIZE)?.into_iter().for_each(|chunk| sh.input(chunk));
+    //     Ok(bytes2string(&sh.result()))
+    // }
 
     fn content_equals(&self, other: &Self) -> Result<bool> {
         let mut src = self.open_ro()?;
@@ -83,4 +113,12 @@ where
         }
         Ok(bytes2string(&sh.result()))
     }
+
+    // fn chunks(&self, chunk_size: usize) -> Result<BufChunkIterator<File>> {
+    //     Ok(
+    //         BufChunkIterator {
+    //             inner: BufReader::with_capacity(chunk_size, self.open_ro()?)
+    //         }
+    //       )
+    // }
 }

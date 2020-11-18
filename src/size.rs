@@ -1,7 +1,7 @@
 use crate::args::CLI_OPTS;
 use crate::file::FileOps;
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::metadata;
 use walkdir::WalkDir;
 
@@ -17,7 +17,10 @@ pub fn size_mode() -> Result<()> {
             continue;
         }
         let size = metadata(&path)?.len();
-        file_map.entry(size).or_insert(Vec::new()).push(path);
+        file_map
+            .entry(size)
+            .or_insert(HashSet::new())
+            .insert(path.content_checksum::<sha1::Sha1>()?);
     }
 
     for file in WalkDir::new(local_path) {
@@ -30,11 +33,11 @@ pub fn size_mode() -> Result<()> {
         if !file_map.contains_key(&size) {
             continue;
         }
-        for src in file_map[&size].iter() {
-            if src.content_equals(&path)? {
-                path.remove_file()?;
-                duplicates += 1;
-            }
+        let chksum = path.content_checksum::<sha1::Sha1>()?;
+
+        if file_map[&size].contains(&chksum) {
+            path.remove_file()?;
+            duplicates += 1;
         }
     }
 
