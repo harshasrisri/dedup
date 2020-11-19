@@ -14,24 +14,25 @@ pub fn bytes2string(byte_array: &[u8]) -> String {
         .collect()
 }
 
-pub struct BufChunkIterator<R: Read> {
+pub struct BufChunkIterator<R> {
     inner: R,
-    buffer: Vec<u8>,
+    chunk_size: usize,
 }
 
 impl<R: Read> Iterator for BufChunkIterator<R> {
     type Item = Vec<u8>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let cs = self.buffer.capacity();
-        self.buffer.clear();
-        let len = self.inner
+        let mut buffer = Vec::with_capacity(self.chunk_size);
+        let len = self
+            .inner
             .by_ref()
-            .take(cs as u64)
-            .read_to_end(&mut self.buffer)
+            .take(self.chunk_size as u64)
+            .read_to_end(&mut buffer)
             .ok();
         if len != Some(0) {
-            len.map(|len| self.buffer[..len].to_owned())
+            len.map(|len| buffer.truncate(len));
+            Some(buffer)
         } else {
             None
         }
@@ -89,7 +90,7 @@ where
     fn chunks(&self, chunk_size: usize) -> Result<BufChunkIterator<File>> {
         Ok(BufChunkIterator {
             inner: self.open_ro()?,
-            buffer: Vec::with_capacity(chunk_size),
+            chunk_size,
         })
     }
 }
