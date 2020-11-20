@@ -1,4 +1,3 @@
-use crate::args::CLI_OPTS;
 use anyhow::Result;
 use digest::Digest;
 use std::fs::{File, OpenOptions};
@@ -40,7 +39,7 @@ impl<R: Read> Iterator for BufChunkIterator<R> {
 }
 
 pub trait FileOps: AsRef<Path> {
-    fn remove_file(&self) -> Result<()>;
+    fn remove_file(&self, commit: bool) -> Result<()>;
     fn content_equals(&self, other: &Self) -> Result<bool>;
     fn content_checksum<D: Digest>(&self) -> Result<String>;
     fn open_ro(&self) -> Result<File>;
@@ -59,15 +58,10 @@ where
             .open(self)?)
     }
 
-    fn remove_file(&self) -> Result<()> {
-        if CLI_OPTS.verbose > 0 {
-            println!("{}", &self.as_ref().to_str().unwrap());
-        }
-
-        if CLI_OPTS.commit {
+    fn remove_file(&self, commit: bool) -> Result<()> {
+        if commit {
             std::fs::remove_file(self)?;
         }
-
         Ok(())
     }
 

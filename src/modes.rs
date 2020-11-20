@@ -24,7 +24,11 @@ pub fn checksum<P: AsRef<Path>>(path: &P) -> Result<String> {
 fn dedup_from_set<P: AsRef<Path>>(filepath: &P, checksums: &HashSet<String>) -> Result<bool> {
     let chksum = checksum(&filepath)?;
     if checksums.contains(&chksum) {
-        return filepath.remove_file().map(|_| true);
+        if CLI_OPTS.verbose > 0 {
+            println!("{}", &filepath.as_ref().to_str().unwrap());
+        }
+
+        return filepath.remove_file(CLI_OPTS.commit).map(|_| true);
     }
     Ok(false)
 }
@@ -109,7 +113,11 @@ pub fn size_mode() -> Result<()> {
         let chksum = path.content_checksum::<sha1::Sha1>()?;
 
         if file_map[&size].contains(&chksum) {
-            path.remove_file()?;
+            if CLI_OPTS.verbose > 0 {
+                println!("{}", &path.to_str().unwrap());
+            }
+
+            path.remove_file(CLI_OPTS.commit)?;
             duplicates += 1;
         }
     }
