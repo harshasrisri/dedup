@@ -30,15 +30,3 @@ fn test_unequal_file_checksum() -> Result<(), Box<dyn std::error::Error>> {
     );
     Ok(())
 }
-
-#[test]
-fn test_bytes2string() {
-    assert_eq!(
-        dedup::file::bytes2string(&[1, 2, 3, 4, 5, 6]),
-        "010203040506".to_string()
-    );
-    assert_eq!(
-        dedup::file::bytes2string(&[0xca, 0xfe, 0xba, 0xbe]),
-        "cafebabe".to_string()
-    );
-}

@@ -6,13 +6,6 @@ use std::path::Path;
 
 const CHUNK_SIZE: usize = 4096;
 
-pub fn bytes2string(byte_array: &[u8]) -> String {
-    byte_array
-        .iter()
-        .map(|byte| format!("{:02x}", byte))
-        .collect()
-}
-
 pub struct BufChunkIterator<R> {
     inner: R,
     chunk_size: usize,
@@ -78,7 +71,7 @@ where
         self.chunks(CHUNK_SIZE)?
             .into_iter()
             .for_each(|chunk| sh.input(chunk));
-        Ok(bytes2string(&sh.result()))
+        Ok(hex::encode(&sh.result()))
     }
 
     fn chunks(&self, chunk_size: usize) -> Result<BufChunkIterator<File>> {
