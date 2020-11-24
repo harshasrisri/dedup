@@ -6,6 +6,7 @@ use std::fs::metadata;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use walkdir::WalkDir;
+use log::info;
 
 pub fn checksum<P: AsRef<Path>>(path: &P) -> Result<String> {
     let algo = CLI_OPTS
@@ -24,10 +25,7 @@ pub fn checksum<P: AsRef<Path>>(path: &P) -> Result<String> {
 fn dedup_from_set<P: AsRef<Path>>(filepath: &P, checksums: &HashSet<String>) -> Result<bool> {
     let chksum = checksum(&filepath)?;
     if checksums.contains(&chksum) {
-        if CLI_OPTS.verbose > 0 {
-            println!("{}", &filepath.as_ref().to_str().unwrap());
-        }
-
+        info!("Removing {}", filepath.as_ref().display());
         return filepath.remove_file(CLI_OPTS.commit).map(|_| true);
     }
     Ok(false)
@@ -50,9 +48,9 @@ fn list_file_to_set<P: AsRef<Path>>(filepath: &P) -> Result<HashSet<String>> {
         .collect())
 }
 
-pub fn hash_mode<P: AsRef<Path>>(list: &P) -> Result<()> {
-    let mut total_count: usize = 0;
-    let mut dup_count: usize = 0;
+pub fn hash_mode() -> Result<(usize, usize)> {
+    let ref list = CLI_OPTS.remote_list.as_ref().expect("Remote List is None");
+    let (mut num_processed, mut num_duplicates) = (0, 0);
 
     let local = &CLI_OPTS.local_path;
     if !local.exists() {
@@ -65,28 +63,25 @@ pub fn hash_mode<P: AsRef<Path>>(list: &P) -> Result<()> {
         if file.path().is_dir() {
             continue;
         }
-        total_count += 1;
-        dup_count += dedup_from_set(&file.path(), &checksums).unwrap_or(false) as usize;
+        num_processed += 1;
+        num_duplicates += dedup_from_set(&file.path(), &checksums).unwrap_or(false) as usize;
     }
 
-    println!(
-        "{} files processed. {} Duplicates {}",
-        total_count,
-        dup_count,
-        if CLI_OPTS.commit {
-            "deleted".to_string()
-        } else {
-            "found".to_string()
-        }
-    );
-    Ok(())
+    Ok((num_processed, num_duplicates))
 }
 
-pub fn size_mode() -> Result<()> {
+pub fn size_mode() -> Result<(usize, usize)> {
     let ref local_path = CLI_OPTS.local_path;
     let ref remote_path = CLI_OPTS.remote_path.as_ref().expect("Remote Path is None");
     let mut file_map = HashMap::new();
-    let (mut processed, mut duplicates) = (0, 0);
+    let (mut num_processed, mut num_duplicates) = (0, 0);
+
+    if std::fs::canonicalize(remote_path)? == std::fs::canonicalize(local_path)? {
+        anyhow::bail!(
+            "In-place deduplication not yet supported. {} and {} are the same path.",
+            remote_path.display(), local_path.display()
+        );
+    }
 
     for file in WalkDir::new(remote_path) {
         let path = file?.into_path();
@@ -105,7 +100,7 @@ pub fn size_mode() -> Result<()> {
         if path.is_dir() {
             continue;
         }
-        processed += 1;
+        num_processed += 1;
         let size = metadata(&path)?.len();
         if !file_map.contains_key(&size) {
             continue;
@@ -113,25 +108,11 @@ pub fn size_mode() -> Result<()> {
         let chksum = path.content_checksum::<sha1::Sha1>()?;
 
         if file_map[&size].contains(&chksum) {
-            if CLI_OPTS.verbose > 0 {
-                println!("{}", &path.to_str().unwrap());
-            }
-
+            info!("Removing {}", path.display());
             path.remove_file(CLI_OPTS.commit)?;
-            duplicates += 1;
+            num_duplicates += 1;
         }
     }
 
-    println!(
-        "{} files processed. {} Duplicates {}",
-        processed,
-        duplicates,
-        if CLI_OPTS.commit {
-            "deleted".to_string()
-        } else {
-            "found".to_string()
-        }
-    );
-
-    Ok(())
+    Ok((num_processed, num_duplicates))
 }

@@ -3,30 +3,55 @@ mod file;
 mod modes;
 use anyhow::Result;
 use args::CLI_OPTS;
+use log::{debug, trace};
+
+fn init_logging() -> Result<()> {
+    let log_level = match CLI_OPTS.verbosity {
+        0 => log::LevelFilter::Off,
+        1 => log::LevelFilter::Error,
+        2 => log::LevelFilter::Warn,
+        3 => log::LevelFilter::Info,
+        4 => log::LevelFilter::Debug,
+        _ => log::LevelFilter::Trace,
+    };
+    simple_logger::SimpleLogger::new()
+        .with_level(log_level)
+        .init()?;
+    Ok(())
+}
 
 fn main() -> Result<()> {
-    if CLI_OPTS.debug {
-        println!("{:?}", CLI_OPTS);
-    }
+    init_logging()?;
+    debug!("{:?}", CLI_OPTS);
 
-    if let Some(remote_list) = &CLI_OPTS.remote_list {
-        return modes::hash_mode(remote_list);
-    }
-
-    let remote_path = CLI_OPTS
-        .remote_path
-        .as_ref()
-        .expect("Expected a remote path CLI option");
-
-    if std::fs::canonicalize(remote_path).unwrap()
-        == std::fs::canonicalize(&CLI_OPTS.local_path).unwrap()
-    {
-        anyhow::bail!(
-            "In-place deduplication not yet supported. {} and {} are the same path.",
-            remote_path.display(),
-            CLI_OPTS.local_path.display()
+    let (num_processed, num_duplicates) = if let Some(remote_list) = &CLI_OPTS.remote_list {
+        trace!(
+            "Starting hash mode dedup at {} using remote list {}",
+            &CLI_OPTS.local_path.display(),
+            remote_list.display()
         );
-    }
+        modes::hash_mode()?
+    } else if let Some(remote_path) = &CLI_OPTS.remote_path {
+        trace!(
+            "Starting size mode dedup as {} using remote path {}",
+            &CLI_OPTS.local_path.display(),
+            remote_path.display()
+        );
+        modes::size_mode()?
+    } else {
+        anyhow::bail!("We're on event horizon? Impossible! Just like this error")
+    };
 
-    modes::size_mode()
+    println!(
+        "{} files processed. {} Duplicates {}",
+        num_processed,
+        num_duplicates,
+        if CLI_OPTS.commit {
+            "deleted".to_string()
+        } else {
+            "found".to_string()
+        }
+    );
+
+    Ok(())
 }

@@ -10,7 +10,7 @@ pub struct DedupOpts {
 
     /// Verbose mode (-v, -vv, -vvv, etc.)
     #[structopt(short, long, parse(from_occurrences))]
-    pub verbose: u8,
+    pub verbosity: u8,
 
     /// File containing list of remote files and hashes
     #[structopt(
