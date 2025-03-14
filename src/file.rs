@@ -23,7 +23,9 @@ impl<R: Read> Iterator for BufChunkIterator<R> {
             .read_to_end(&mut buffer)
             .ok();
         if len != Some(0) {
-            len.map(|len| buffer.truncate(len));
+            if let Some(len) = len {
+                buffer.truncate(len)
+            }
             Some(buffer)
         } else {
             None
@@ -33,7 +35,6 @@ impl<R: Read> Iterator for BufChunkIterator<R> {
 
 pub trait FileOps: AsRef<Path> {
     fn remove_file(&self, commit: bool) -> Result<()>;
-    fn content_equals(&self, other: &Self) -> Result<bool>;
     fn content_checksum<D: Digest>(&self) -> Result<String>;
     fn open_ro(&self) -> Result<File>;
     fn chunks(&self, chunk_size: usize) -> Result<BufChunkIterator<File>>;
@@ -58,20 +59,11 @@ where
         Ok(())
     }
 
-    fn content_equals(&self, other: &Self) -> Result<bool> {
-        Ok(self
-            .chunks(CHUNK_SIZE)?
-            .into_iter()
-            .zip(other.chunks(CHUNK_SIZE)?.into_iter())
-            .all(|(c1, c2)| c1 == c2))
-    }
-
     fn content_checksum<D: Digest>(&self) -> Result<String> {
         let mut sh = D::new();
         self.chunks(CHUNK_SIZE)?
-            .into_iter()
             .for_each(|chunk| sh.input(chunk));
-        Ok(hex::encode(&sh.result()))
+        Ok(hex::encode(sh.result()))
     }
 
     fn chunks(&self, chunk_size: usize) -> Result<BufChunkIterator<File>> {

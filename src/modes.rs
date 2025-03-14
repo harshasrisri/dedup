@@ -42,14 +42,14 @@ fn list_file_to_set<P: AsRef<Path>>(filepath: &P) -> Result<HashSet<String>> {
     };
     Ok(BufReader::new(remote)
         .lines()
-        .filter_map(|result| result.ok())
-        .filter_map(|line| line.split(' ').nth(0).map(|slice| slice.to_string()))
+        .map_while(Result::ok)
+        .filter_map(|line| line.split(' ').next().map(|slice| slice.to_string()))
         .map(|hash| hash.to_owned())
         .collect())
 }
 
 pub fn hash_mode() -> Result<(usize, usize)> {
-    let ref list = CLI_OPTS.remote_list.as_ref().expect("Remote List is None");
+    let list = &CLI_OPTS.remote_list.as_ref().expect("Remote List is None");
     let (mut num_processed, mut num_duplicates) = (0, 0);
 
     let local = &CLI_OPTS.local_path;
@@ -58,7 +58,7 @@ pub fn hash_mode() -> Result<(usize, usize)> {
     }
     let checksums = list_file_to_set(&list)?;
 
-    for file in walkdir::WalkDir::new(&local) {
+    for file in walkdir::WalkDir::new(local) {
         let file = file.unwrap();
         if file.path().is_dir() {
             continue;
@@ -71,15 +71,16 @@ pub fn hash_mode() -> Result<(usize, usize)> {
 }
 
 pub fn size_mode() -> Result<(usize, usize)> {
-    let ref local_path = CLI_OPTS.local_path;
-    let ref remote_path = CLI_OPTS.remote_path.as_ref().expect("Remote Path is None");
+    let local_path = &CLI_OPTS.local_path;
+    let remote_path = &CLI_OPTS.remote_path.as_ref().expect("Remote Path is None");
     let mut file_map = HashMap::new();
     let (mut num_processed, mut num_duplicates) = (0, 0);
 
     if std::fs::canonicalize(remote_path)? == std::fs::canonicalize(local_path)? {
         anyhow::bail!(
             "In-place deduplication not yet supported. {} and {} are the same path.",
-            remote_path.display(), local_path.display()
+            remote_path.display(),
+            local_path.display()
         );
     }
 
