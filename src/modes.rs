@@ -6,7 +6,7 @@ use std::fs::metadata;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use walkdir::WalkDir;
-use log::info;
+use log::{error, info};
 
 pub fn checksum<P: AsRef<Path>>(path: &P) -> Result<String> {
     let algo = CLI_OPTS
@@ -26,9 +26,14 @@ fn dedup_from_set<P: AsRef<Path>>(filepath: &P, checksums: &HashSet<String>) -> 
     let chksum = checksum(&filepath)?;
     if checksums.contains(&chksum) {
         info!("Removing {}", filepath.as_ref().display());
-        return filepath.remove_file(CLI_OPTS.commit).map(|_| true);
+        match filepath.remove_file(CLI_OPTS.commit) {
+            Ok(()) => info!("Removed file: {}", filepath.as_ref().display()),
+            Err(e) => error!("Error removing file {}: {e}", filepath.as_ref().display()),
+        }
+        Ok(true)
+    } else {
+        Ok(false)
     }
-    Ok(false)
 }
 
 fn list_file_to_set<P: AsRef<Path>>(filepath: &P) -> Result<HashSet<String>> {
@@ -38,7 +43,7 @@ fn list_file_to_set<P: AsRef<Path>>(filepath: &P) -> Result<HashSet<String>> {
         .ok_or(Error::msg("Error reading filename"))?
     {
         "-" => Box::new(std::io::stdin()),
-        _ => Box::new(filepath.open_ro()?),
+        path => Box::new(path.open_ro()?),
     };
     Ok(BufReader::new(remote)
         .lines()
@@ -110,7 +115,10 @@ pub fn size_mode() -> Result<(usize, usize)> {
 
         if file_map[&size].contains(&chksum) {
             info!("Removing {}", path.display());
-            path.remove_file(CLI_OPTS.commit)?;
+            match path.remove_file(CLI_OPTS.commit) {
+                Ok(()) => info!("Removed file: {}", path.display()),
+                Err(e) => error!("Error removing file {}: {e}", path.display()),
+            }
             num_duplicates += 1;
         }
     }
