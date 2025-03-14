@@ -3,7 +3,7 @@ name = "dedup"
 version = "0.2.0"
 authors = ["Sriharsha Mucheli <harshasrisri@gmail.com>"]
 description = "Program to find duplicate files and take care of them"
-edition = "2018"
+edition = "2024"
 
 [dependencies]
 md-5 = "0.8"
@@ -11,9 +11,10 @@ sha-1 = "0.8"
 sha2 = "0.8"
 digest = "0.8"
 walkdir = "2"
-lazy_static = "1.4.0"
+lazy_static = "1.5.0"
 anyhow = "1.0"
 hex = "0.4.2"
-log = "0.4.11"
-simple_logger = "1.11"
+log = "0.4.26"
+simple_logger = "5.0"
 clap = { version = "4.5.32", features = ["derive"] }
+twox-hash = "2.1.0"
