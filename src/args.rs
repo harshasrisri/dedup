@@ -1,6 +1,6 @@
+use clap::Parser;
 use lazy_static::lazy_static;
 use std::path::PathBuf;
-use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -20,19 +20,11 @@ pub struct DedupOpts {
     pub remote_list: Option<PathBuf>,
 
     /// Remote path to use as a reference to filter duplicates in local
-    #[arg(
-        short = 'r',
-        long = "remote-path",
-        conflicts_with = "remote_list"
-    )]
+    #[arg(short = 'r', long = "remote-path", conflicts_with = "remote_list")]
     pub remote_path: Option<PathBuf>,
 
     /// Local Path containing files that need to be checked for duplicates
-    #[arg(
-        short = 'l',
-        long = "local-path",
-        default_value = "."
-    )]
+    #[arg(short = 'l', long = "local-path", default_value = ".")]
     pub local_path: PathBuf,
 
     /// Type of Hashing algorigthm to use for checksumming.
