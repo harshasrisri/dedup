@@ -14,12 +14,12 @@ pub async fn checksum<P: AsRef<Path>>(path: &P) -> Result<String> {
         .as_ref()
         .ok_or(Error::msg("Hash algo should have been set"))?;
     match algo.as_str() {
-        "MD5" | "Md5" | "md5" => path.content_checksum::<md5::Md5>().await,
-        "SHA1" | "Sha1" | "sha1" => path.content_checksum::<sha1::Sha1>().await,
-        "SHA128" | "Sha128" | "sha128" => path.content_checksum::<sha1::Sha1>().await,
-        "SHA2" | "Sha2" | "sha2" => path.content_checksum::<sha2::Sha256>().await,
-        "SHA256" | "Sha256" | "sha256" => path.content_checksum::<sha2::Sha256>().await,
-        "SHA512" | "Sha512" | "sha512" => path.content_checksum::<sha2::Sha512>().await,
+        "MD5" | "Md5" | "md5" => path.content_digest::<md5::Md5>().await,
+        "SHA1" | "Sha1" | "sha1" => path.content_digest::<sha1::Sha1>().await,
+        "SHA2" | "Sha2" | "sha2" => path.content_digest::<sha2::Sha256>().await,
+        "SHA128" | "Sha128" | "sha128" => path.content_digest::<sha1::Sha1>().await,
+        "SHA256" | "Sha256" | "sha256" => path.content_digest::<sha2::Sha256>().await,
+        "SHA512" | "Sha512" | "sha512" => path.content_digest::<sha2::Sha512>().await,
         _ => anyhow::bail!("Unsupported hash algorithm - {}", algo),
     }
 }

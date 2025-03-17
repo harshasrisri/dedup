@@ -65,9 +65,11 @@ pub async fn size_mode() -> Result<(usize, usize)> {
                 local_file.display(),
                 file_map[&size]
             );
-            let local_chksum = local_file.content_checksum::<sha1::Sha1>().await?;
+            let local_chksum = local_file.content_chksum().await?;
+            // let local_chksum = local_file.content_digest::<sha1::Sha1>().await?;
             for remote_file in &file_map[&size] {
-                let remote_chksum = remote_file.content_checksum::<sha1::Sha1>().await?;
+                let remote_chksum = remote_file.content_chksum().await?;
+                // let remote_chksum = remote_file.content_digest::<sha1::Sha1>().await?;
                 if local_chksum == remote_chksum {
                     let action = if CLI_OPTS.commit { "remov" } else { "process" };
                     debug!(
