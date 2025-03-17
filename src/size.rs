@@ -1,7 +1,7 @@
 use crate::args::CLI_OPTS;
 use crate::file::FileOps;
 use anyhow::Result;
-use log::{debug, error, info};
+use log::{debug, error, trace};
 use std::collections::{HashMap, HashSet};
 use tokio::fs::{canonicalize, metadata};
 use walkdir::WalkDir;
@@ -21,7 +21,7 @@ pub async fn size_mode() -> Result<(usize, usize)> {
     }
 
     for entry in WalkDir::new(remote_path) {
-        let file_path = match entry {
+        let remote_file = match entry {
             Ok(file) => file.into_path(),
             Err(e) => {
                 error!("Error while walking {}: {}", remote_path.display(), e);
@@ -29,19 +29,19 @@ pub async fn size_mode() -> Result<(usize, usize)> {
             }
         };
 
-        if file_path.is_dir() {
+        if remote_file.is_dir() {
             continue;
         }
 
-        let size = metadata(&file_path).await?.len();
+        let size = metadata(&remote_file).await?.len();
         file_map
             .entry(size)
             .or_insert(HashSet::new())
-            .insert(file_path);
+            .insert(remote_file);
     }
 
     for entry in WalkDir::new(local_path) {
-        let file_path = match entry {
+        let local_file = match entry {
             Ok(file) => file.into_path(),
             Err(e) => {
                 error!("Error while walking {}: {}", local_path.display(), e);
@@ -49,29 +49,34 @@ pub async fn size_mode() -> Result<(usize, usize)> {
             }
         };
 
-        if file_path.is_dir() {
+        if local_file.is_dir() {
             continue;
         }
 
         num_processed += 1;
-        let size = metadata(&file_path).await?.len();
+        let size = metadata(&local_file).await?.len();
         if !file_map.contains_key(&size) {
             continue;
         }
 
         if !file_map[&size].is_empty() {
-            debug!(
+            trace!(
                 "Found multiple of same size={size}: {}, {:?}",
-                file_path.display(),
+                local_file.display(),
                 file_map[&size]
             );
-            let local_chksum = file_path.content_checksum::<sha1::Sha1>().await?;
+            let local_chksum = local_file.content_checksum::<sha1::Sha1>().await?;
             for remote_file in &file_map[&size] {
                 let remote_chksum = remote_file.content_checksum::<sha1::Sha1>().await?;
                 if local_chksum == remote_chksum {
-                    match file_path.remove_file(CLI_OPTS.commit).await {
-                        Ok(()) => info!("Removed file: {}", file_path.display()),
-                        Err(e) => error!("Error removing file {}: {e}", file_path.display()),
+                    let action = if CLI_OPTS.commit { "remov" } else { "process" };
+                    debug!(
+                        "{action}ing duplicate files: local={} remote={}",
+                        local_file.display(),
+                        remote_file.display()
+                    );
+                    if let Err(e) = local_file.remove_file(CLI_OPTS.commit).await {
+                        error!("Error {action}ing file {}: {e}", local_file.display());
                     }
                     num_duplicates += 1;
                     break;

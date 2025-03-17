@@ -28,7 +28,7 @@ where
 
     async fn remove_file(&self, commit: bool) -> Result<()> {
         if commit {
-            debug!("Removing {}", self.as_ref().display());
+            debug!("Removing file: {}", self.as_ref().display());
             tokio::fs::remove_file(self).await?;
         } else {
             debug!("Candidate for removal: {}", self.as_ref().display());

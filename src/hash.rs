@@ -2,7 +2,7 @@ use crate::args::CLI_OPTS;
 use crate::file::FileOps;
 use anyhow::anyhow;
 use anyhow::{Error, Result};
-use log::{debug, error, info};
+use log::{debug, error};
 use std::collections::HashSet;
 use std::path::Path;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -27,10 +27,13 @@ pub async fn checksum<P: AsRef<Path>>(path: &P) -> Result<String> {
 async fn dedup_from_set<P: AsRef<Path>>(filepath: &P, checksums: &HashSet<String>) -> Result<bool> {
     let chksum = checksum(&filepath).await?;
     if checksums.contains(&chksum) {
-        debug!("Removing {}", filepath.as_ref().display());
-        match filepath.remove_file(CLI_OPTS.commit).await {
-            Ok(()) => info!("Removed file: {}", filepath.as_ref().display()),
-            Err(e) => error!("Error removing file {}: {e}", filepath.as_ref().display()),
+        let action = if CLI_OPTS.commit { "remov" } else { "process" };
+        debug!("{action}ing {}", filepath.as_ref().display());
+        if let Err(e) = filepath.remove_file(CLI_OPTS.commit).await {
+            error!(
+                "Error {action}ing file {}: {e}",
+                filepath.as_ref().display()
+            );
         }
         Ok(true)
     } else {
