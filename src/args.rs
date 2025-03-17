@@ -28,7 +28,7 @@ pub struct DedupOpts {
     pub local_path: PathBuf,
 
     /// Type of Hashing algorigthm to use for checksumming.
-    #[arg(short = 'H', long, requires = "remote_list")]
+    #[arg(short = 'H', long, requires = "remote_list", default_value = "sha1")]
     pub hash: Option<String>,
 
     /// Performs a dry run by default. Use this option to commit file deletions
