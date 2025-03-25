@@ -16,6 +16,7 @@ pub trait FileOps: AsRef<Path> {
     fn digest(&self, hash: &HashMode) -> impl Future<Output = Result<String>>;
     fn content_chksum(&self) -> impl Future<Output = Result<String>>;
     fn open_ro(&self) -> impl Future<Output = Result<File>>;
+    fn open_rw(&self) -> impl Future<Output = Result<File>>;
 }
 
 impl<P> FileOps for P
@@ -64,10 +65,22 @@ where
         }
         Ok(format!("{:X}", sh.finish()))
     }
+
+    async fn open_rw(&self) -> Result<File> {
+        trace!("{}: opening file in RW mode", self.as_ref().display());
+        Ok(OpenOptions::new()
+            .read(false)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(self)
+            .await?)
+    }
 }
 
 async fn content_digest<P, D: Digest>(path: &P) -> Result<String>
-where P: AsRef<Path> + ?Sized
+where
+    P: AsRef<Path> + ?Sized,
 {
     let mut sh = D::new();
     let file = path.open_ro().await?;
@@ -89,4 +102,3 @@ where P: AsRef<Path> + ?Sized
     trace!("{}: digested {file_size} bytes", path.as_ref().display());
     Ok(hex::encode(sh.result()))
 }
-
