@@ -1,3 +1,4 @@
+use crate::hash::HashMode;
 use clap::Parser;
 use lazy_static::lazy_static;
 use std::path::PathBuf;
@@ -29,7 +30,7 @@ pub struct DedupOpts {
 
     /// Type of Hashing algorigthm to use for checksumming.
     #[arg(short = 'H', long, requires = "remote_list", default_value = "sha1")]
-    pub hash: Option<String>,
+    pub hash: HashMode,
 
     /// Performs a dry run by default. Use this option to commit file deletions
     #[arg(short, long)]

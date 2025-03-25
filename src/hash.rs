@@ -1,51 +1,46 @@
-use crate::args::CLI_OPTS;
 use crate::file::FileOps;
-use anyhow::anyhow;
 use anyhow::{Error, Result};
-use log::{debug, error};
+use log::{debug, error, info};
 use std::collections::HashSet;
 use std::path::Path;
+use std::str::FromStr;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use walkdir::WalkDir;
 
-pub async fn checksum<P: AsRef<Path>>(path: &P) -> Result<String> {
-    let algo = CLI_OPTS
-        .hash
-        .as_ref()
-        .ok_or(Error::msg("Hash algo should have been set"))?;
-    match algo.as_str() {
-        "MD5" | "Md5" | "md5" => path.content_digest::<md5::Md5>().await,
-        "SHA1" | "Sha1" | "sha1" => path.content_digest::<sha1::Sha1>().await,
-        "SHA2" | "Sha2" | "sha2" => path.content_digest::<sha2::Sha256>().await,
-        "SHA128" | "Sha128" | "sha128" => path.content_digest::<sha1::Sha1>().await,
-        "SHA256" | "Sha256" | "sha256" => path.content_digest::<sha2::Sha256>().await,
-        "SHA512" | "Sha512" | "sha512" => path.content_digest::<sha2::Sha512>().await,
-        _ => anyhow::bail!("Unsupported hash algorithm - {}", algo),
-    }
+#[derive(Debug, Clone)]
+pub enum HashMode {
+    MD5,
+    SHA1,
+    SHA2,
 }
 
-async fn dedup_from_set<P: AsRef<Path>>(filepath: &P, checksums: &HashSet<String>) -> Result<bool> {
-    let chksum = checksum(&filepath).await?;
-    if checksums.contains(&chksum) {
-        let action = if CLI_OPTS.commit { "remov" } else { "process" };
-        debug!("{action}ing {}", filepath.as_ref().display());
-        if let Err(e) = filepath.remove_file(CLI_OPTS.commit).await {
-            error!(
-                "Error {action}ing file {}: {e}",
-                filepath.as_ref().display()
-            );
+impl FromStr for HashMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let hash = s.to_ascii_lowercase();
+        match hash.as_str() {
+            "md5" => Ok(HashMode::MD5),
+            "sha1" | "sha128" => Ok(HashMode::SHA1),
+            "sha2" | "sha256" => Ok(HashMode::SHA2),
+            _ => Err(format!("Unsupported/Invalid hash algorithm: {hash}")),
         }
-        Ok(true)
-    } else {
-        Ok(false)
     }
 }
 
-async fn remote_chksums() -> Result<HashSet<String>> {
-    let filepath = CLI_OPTS
-        .remote_list
-        .as_ref()
-        .ok_or_else(|| anyhow!("Should have had a remote list to work with"))?;
+impl HashMode {
+    pub async fn digest_file<P: AsRef<Path>>(&self, path: P) -> Result<String> {
+        debug!("digest_file: {}", path.as_ref().display());
+        match &self {
+            HashMode::MD5 => path.content_digest::<md5::Md5>().await,
+            HashMode::SHA1 => path.content_digest::<sha1::Sha1>().await,
+            HashMode::SHA2 => path.content_digest::<sha2::Sha256>().await,
+        }
+    }
+}
+
+async fn remote_chksums<P: AsRef<Path>>(remote_list: P) -> Result<HashSet<String>> {
+    let filepath = remote_list.as_ref();
     let remote: Box<dyn tokio::io::AsyncRead + Unpin> = match filepath
         .to_str()
         .ok_or(Error::msg("Error reading filename"))?
@@ -62,20 +57,33 @@ async fn remote_chksums() -> Result<HashSet<String>> {
     Ok(ret)
 }
 
-pub async fn hash_mode() -> Result<(usize, usize)> {
-    let local_path = &CLI_OPTS.local_path;
-    if !local_path.exists() {
-        anyhow::bail!("Local path not found - {}", local_path.to_str().unwrap());
+pub async fn hash_mode<P: AsRef<Path>>(
+    local_path: P,
+    remote_list: P,
+    hash: &HashMode,
+    commit: bool,
+) -> Result<(usize, usize)> {
+    let local_path = local_path;
+    if !local_path.as_ref().exists() {
+        anyhow::bail!(
+            "Local path not found - {}",
+            local_path.as_ref().to_str().unwrap()
+        );
     }
 
-    let checksums = remote_chksums().await?;
+    let checksums = remote_chksums(&remote_list).await?;
+    info!("Found {} entries in remote list {}", checksums.len(), remote_list.as_ref().display());
     let (mut num_processed, mut num_duplicates) = (0, 0);
 
-    for entry in WalkDir::new(local_path) {
+    for entry in WalkDir::new(&local_path) {
         let file_path = match entry {
             Ok(file) => file.into_path(),
             Err(e) => {
-                error!("Error while walking {}: {}", local_path.display(), e);
+                error!(
+                    "Error while walking {}: {}",
+                    local_path.as_ref().display(),
+                    e
+                );
                 continue;
             }
         };
@@ -85,9 +93,20 @@ pub async fn hash_mode() -> Result<(usize, usize)> {
         }
 
         num_processed += 1;
-        num_duplicates += dedup_from_set(&file_path, &checksums)
-            .await
-            .unwrap_or(false) as usize;
+
+        let action = if commit { "remov" } else { "process" };
+        let chksum = hash.digest_file(&file_path).await?;
+        debug!("{chksum} {}", file_path.display());
+
+        if !checksums.contains(&chksum) {
+            continue;
+        }
+
+        if let Err(e) = file_path.remove_file(commit).await {
+            error!("Error {action}ing file {}: {e}", file_path.display());
+        } else {
+            num_duplicates += 1;
+        }
     }
 
     Ok((num_processed, num_duplicates))

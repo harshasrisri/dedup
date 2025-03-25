@@ -4,12 +4,13 @@ mod hash;
 mod size;
 use anyhow::Result;
 use args::CLI_OPTS;
-use log::{debug, error, info};
+use log::{debug, error};
 
 fn init_logging() -> Result<()> {
     let log_level = match CLI_OPTS.verbosity {
-        0 => log::LevelFilter::Info,
-        1 => log::LevelFilter::Debug,
+        0 => log::LevelFilter::Warn,
+        1 => log::LevelFilter::Info,
+        2 => log::LevelFilter::Debug,
         _ => log::LevelFilter::Trace,
     };
     simple_logger::SimpleLogger::new()
@@ -29,7 +30,15 @@ async fn main() -> Result<()> {
             CLI_OPTS.local_path.display(),
             remote_list.display()
         );
-        match hash::hash_mode().await {
+        // hash_mode(local_path: P, remote_list: P, hash: &HashMode, commit: bool)
+        match hash::hash_mode(
+            CLI_OPTS.local_path.to_path_buf(),
+            remote_list.to_path_buf(),
+            &CLI_OPTS.hash,
+            CLI_OPTS.commit,
+        )
+        .await
+        {
             Ok(ok) => ok,
             Err(e) => {
                 error!(
@@ -67,7 +76,7 @@ async fn main() -> Result<()> {
         anyhow::bail!("We're on event horizon? Impossible! Just like this error")
     };
 
-    info!(
+    println!(
         "{} files processed. {} Duplicates {}",
         num_processed,
         num_duplicates,
