@@ -1,11 +1,11 @@
 use anyhow::Result;
 use digest::Digest;
-use log::debug;
-use twox_hash::XxHash64;
+use log::{debug, trace};
 use std::hash::Hasher;
 use std::path::Path;
 use tokio::fs::{File, OpenOptions};
-use tokio::io::{AsyncReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+use twox_hash::XxHash64;
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -21,6 +21,7 @@ where
     P: AsRef<Path> + ?Sized,
 {
     async fn open_ro(&self) -> Result<File> {
+        trace!("Opening file in RO mode: {}", self.as_ref().display());
         Ok(OpenOptions::new()
             .read(true)
             .write(false)
@@ -40,17 +41,26 @@ where
     }
 
     async fn content_digest<D: Digest>(&self) -> Result<String> {
+        debug!("content_digest: {}", self.as_ref().display());
         let mut sh = D::new();
         let file = self.open_ro().await?;
         let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
-        let mut buffer = Vec::with_capacity(CHUNK_SIZE);
+        let mut file_size = 0;
 
-        while let Ok(size) = reader.read(&mut buffer).await {
-            if size == 0 {
+        while let Ok(slice) = reader.fill_buf().await {
+            let len = slice.len();
+            if len != 0 {
+                sh.input(slice);
+                trace!("ingesting {len} bytes of file {}", self.as_ref().display());
+                file_size += len;
+                let _ = slice;
+            } else {
                 break;
             }
-            sh.input(&buffer);
+            reader.consume(len);
         }
+        debug!("Digested {file_size} bytes of file {}", self.as_ref().display());
+
         Ok(hex::encode(sh.result()))
     }
 
