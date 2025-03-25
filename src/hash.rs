@@ -28,16 +28,6 @@ impl FromStr for HashMode {
     }
 }
 
-impl HashMode {
-    pub async fn digest_file<P: AsRef<Path>>(&self, path: P) -> Result<String> {
-        match &self {
-            HashMode::MD5 => path.content_digest::<md5::Md5>().await,
-            HashMode::SHA1 => path.content_digest::<sha1::Sha1>().await,
-            HashMode::SHA2 => path.content_digest::<sha2::Sha256>().await,
-        }
-    }
-}
-
 async fn remote_chksums<P: AsRef<Path>>(remote_list: P) -> Result<HashSet<String>> {
     let filepath = remote_list.as_ref();
     let remote: Box<dyn tokio::io::AsyncRead + Unpin> = match filepath
@@ -95,7 +85,7 @@ pub async fn hash_mode<P: AsRef<Path>>(
         num_processed += 1;
 
         let action = if commit { "remov" } else { "process" };
-        let chksum = hash.digest_file(&file_path).await?;
+        let chksum = file_path.digest(hash).await?;
 
         if !checksums.contains(&chksum) {
             debug!("skipping file: {}", file_path.display());

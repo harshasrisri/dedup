@@ -1,17 +1,19 @@
 use anyhow::Result;
 use digest::Digest;
-use log::{debug, trace};
+use log::trace;
 use std::hash::Hasher;
 use std::path::Path;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use twox_hash::XxHash64;
 
+use crate::hash::HashMode;
+
 const CHUNK_SIZE: usize = 4096;
 
 pub trait FileOps: AsRef<Path> {
     fn remove_file(&self, commit: bool) -> impl Future<Output = Result<()>>;
-    fn content_digest<D: Digest>(&self) -> impl Future<Output = Result<String>>;
+    fn digest(&self, hash: &HashMode) -> impl Future<Output = Result<String>>;
     fn content_chksum(&self) -> impl Future<Output = Result<String>>;
     fn open_ro(&self) -> impl Future<Output = Result<File>>;
 }
@@ -40,26 +42,12 @@ where
         Ok(())
     }
 
-    async fn content_digest<D: Digest>(&self) -> Result<String> {
-        let mut sh = D::new();
-        let file = self.open_ro().await?;
-        let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
-        let mut file_size = 0;
-
-        while let Ok(slice) = reader.fill_buf().await {
-            let len = slice.len();
-            if len != 0 {
-                sh.input(slice);
-                trace!("{}: ingesting {len} bytes", self.as_ref().display());
-                file_size += len;
-                let _ = slice;
-            } else {
-                break;
-            }
-            reader.consume(len);
+    async fn digest(&self, hash: &HashMode) -> Result<String> {
+        match hash {
+            HashMode::MD5 => content_digest::<P, md5::Md5>(self).await,
+            HashMode::SHA1 => content_digest::<P, sha1::Sha1>(self).await,
+            HashMode::SHA2 => content_digest::<P, sha2::Sha256>(self).await,
         }
-        trace!("{}: digested {file_size} bytes", self.as_ref().display());
-        Ok(hex::encode(sh.result()))
     }
 
     async fn content_chksum(&self) -> Result<String> {
@@ -77,3 +65,28 @@ where
         Ok(format!("{:X}", sh.finish()))
     }
 }
+
+async fn content_digest<P, D: Digest>(path: &P) -> Result<String>
+where P: AsRef<Path> + ?Sized
+{
+    let mut sh = D::new();
+    let file = path.open_ro().await?;
+    let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
+    let mut file_size = 0;
+
+    while let Ok(slice) = reader.fill_buf().await {
+        let len = slice.len();
+        if len != 0 {
+            sh.input(slice);
+            trace!("{}: ingesting {len} bytes", path.as_ref().display());
+            file_size += len;
+            let _ = slice;
+        } else {
+            break;
+        }
+        reader.consume(len);
+    }
+    trace!("{}: digested {file_size} bytes", path.as_ref().display());
+    Ok(hex::encode(sh.result()))
+}
+
