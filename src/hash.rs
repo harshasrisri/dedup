@@ -30,7 +30,6 @@ impl FromStr for HashMode {
 
 impl HashMode {
     pub async fn digest_file<P: AsRef<Path>>(&self, path: P) -> Result<String> {
-        debug!("digest_file: {}", path.as_ref().display());
         match &self {
             HashMode::MD5 => path.content_digest::<md5::Md5>().await,
             HashMode::SHA1 => path.content_digest::<sha1::Sha1>().await,
@@ -52,7 +51,8 @@ async fn remote_chksums<P: AsRef<Path>>(remote_list: P) -> Result<HashSet<String
     let mut lines = BufReader::new(remote).lines();
     let mut ret = HashSet::new();
     while let Some(line) = lines.next_line().await? {
-        ret.insert(line.to_string());
+        let line = line.split_whitespace().next().unwrap_or_default();
+        ret.insert(line.trim().to_string());
     }
     Ok(ret)
 }
@@ -72,18 +72,18 @@ pub async fn hash_mode<P: AsRef<Path>>(
     }
 
     let checksums = remote_chksums(&remote_list).await?;
-    info!("Found {} entries in remote list {}", checksums.len(), remote_list.as_ref().display());
+    info!(
+        "Found {} entries in remote list {}",
+        checksums.len(),
+        remote_list.as_ref().display()
+    );
     let (mut num_processed, mut num_duplicates) = (0, 0);
 
     for entry in WalkDir::new(&local_path) {
         let file_path = match entry {
             Ok(file) => file.into_path(),
             Err(e) => {
-                error!(
-                    "Error while walking {}: {}",
-                    local_path.as_ref().display(),
-                    e
-                );
+                error!("{}: error while walking: {e}", local_path.as_ref().display());
                 continue;
             }
         };
@@ -96,16 +96,16 @@ pub async fn hash_mode<P: AsRef<Path>>(
 
         let action = if commit { "remov" } else { "process" };
         let chksum = hash.digest_file(&file_path).await?;
-        debug!("{chksum} {}", file_path.display());
 
         if !checksums.contains(&chksum) {
+            debug!("skipping file: {}", file_path.display());
             continue;
         }
 
+        num_duplicates += 1;
+        info!("{action}ing file: {}", file_path.display());
         if let Err(e) = file_path.remove_file(commit).await {
-            error!("Error {action}ing file {}: {e}", file_path.display());
-        } else {
-            num_duplicates += 1;
+            error!("error {action}ing file {}: {e}", file_path.display());
         }
     }
 

@@ -21,7 +21,7 @@ where
     P: AsRef<Path> + ?Sized,
 {
     async fn open_ro(&self) -> Result<File> {
-        trace!("Opening file in RO mode: {}", self.as_ref().display());
+        trace!("{}: opening file in RO mode", self.as_ref().display());
         Ok(OpenOptions::new()
             .read(true)
             .write(false)
@@ -32,16 +32,15 @@ where
 
     async fn remove_file(&self, commit: bool) -> Result<()> {
         if commit {
-            debug!("Removing file: {}", self.as_ref().display());
+            trace!("{}: removing file", self.as_ref().display());
             tokio::fs::remove_file(self).await?;
         } else {
-            debug!("Candidate for removal: {}", self.as_ref().display());
+            trace!("{}: candidate for removal", self.as_ref().display());
         }
         Ok(())
     }
 
     async fn content_digest<D: Digest>(&self) -> Result<String> {
-        debug!("content_digest: {}", self.as_ref().display());
         let mut sh = D::new();
         let file = self.open_ro().await?;
         let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
@@ -51,7 +50,7 @@ where
             let len = slice.len();
             if len != 0 {
                 sh.input(slice);
-                trace!("ingesting {len} bytes of file {}", self.as_ref().display());
+                trace!("{}: ingesting {len} bytes", self.as_ref().display());
                 file_size += len;
                 let _ = slice;
             } else {
@@ -59,8 +58,7 @@ where
             }
             reader.consume(len);
         }
-        debug!("Digested {file_size} bytes of file {}", self.as_ref().display());
-
+        trace!("{}: digested {file_size} bytes", self.as_ref().display());
         Ok(hex::encode(sh.result()))
     }
 
