@@ -2,6 +2,8 @@ mod args;
 mod file;
 mod hash;
 mod size;
+use std::fs::canonicalize;
+
 use anyhow::Result;
 use args::CLI_OPTS;
 use log::{debug, error};
@@ -73,7 +75,15 @@ async fn main() -> Result<()> {
             }
         }
     } else {
-        anyhow::bail!("We're on event horizon? Impossible! Just like this error")
+        debug!(
+            "Starting analysis at {}, using hashing algorithm {} and writing out to {}",
+            canonicalize(&CLI_OPTS.local_path).unwrap().display(),
+            CLI_OPTS.hash,
+            CLI_OPTS.output_file.display()
+        );
+
+        hash::analyze_path(&CLI_OPTS.local_path, &CLI_OPTS.hash, &CLI_OPTS.output_file).await?;
+        return Ok(());
     };
 
     println!(

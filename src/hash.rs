@@ -1,10 +1,13 @@
 use crate::file::FileOps;
 use anyhow::{Error, Result};
 use log::{debug, error, info};
-use std::collections::HashSet;
+use std::collections::HashMap;
+use std::fmt::Write;
 use std::path::Path;
 use std::str::FromStr;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use std::{collections::HashSet, fmt::Display};
+use tokio::fs::metadata;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone)]
@@ -25,6 +28,16 @@ impl FromStr for HashMode {
             "sha2" | "sha256" => Ok(HashMode::SHA2),
             _ => Err(format!("Unsupported/Invalid hash algorithm: {hash}")),
         }
+    }
+}
+
+impl Display for HashMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            HashMode::MD5 => "MD5",
+            HashMode::SHA1 => "SHA1",
+            HashMode::SHA2 => "SHA2",
+        })
     }
 }
 
@@ -53,12 +66,8 @@ pub async fn hash_mode<P: AsRef<Path>>(
     hash: &HashMode,
     commit: bool,
 ) -> Result<(usize, usize)> {
-    let local_path = local_path;
     if !local_path.as_ref().exists() {
-        anyhow::bail!(
-            "Local path not found - {}",
-            local_path.as_ref().to_str().unwrap()
-        );
+        anyhow::bail!("Local path not found - {}", local_path.as_ref().display());
     }
 
     let checksums = remote_chksums(&remote_list).await?;
@@ -73,7 +82,10 @@ pub async fn hash_mode<P: AsRef<Path>>(
         let file_path = match entry {
             Ok(file) => file.into_path(),
             Err(e) => {
-                error!("{}: error while walking: {e}", local_path.as_ref().display());
+                error!(
+                    "{}: error while walking: {e}",
+                    local_path.as_ref().display()
+                );
                 continue;
             }
         };
@@ -100,4 +112,72 @@ pub async fn hash_mode<P: AsRef<Path>>(
     }
 
     Ok((num_processed, num_duplicates))
+}
+
+pub async fn analyze_path<P: AsRef<Path>>(
+    local_path: P,
+    hash: &HashMode,
+    output_file: P,
+) -> Result<()> {
+    if !local_path.as_ref().exists() {
+        anyhow::bail!("Local path not found - {}", local_path.as_ref().display());
+    }
+
+    let mut file_map = HashMap::new();
+    let mut num_analyzed = 0;
+
+    for entry in WalkDir::new(&local_path) {
+        let file_path = match entry {
+            Ok(file) => file.into_path(),
+            Err(e) => {
+                error!(
+                    "{}: error while walking: {e}",
+                    local_path.as_ref().display()
+                );
+                continue;
+            }
+        };
+
+        if file_path.is_dir() {
+            continue;
+        }
+
+        num_analyzed += 1;
+        let chksum = file_path.digest(hash).await?;
+        let size = metadata(&file_path).await?.len();
+
+        file_map
+            .entry(size)
+            .or_insert(HashSet::new())
+            .insert(chksum);
+    }
+
+    info!("Analyzed {num_analyzed} files");
+    write_output(&file_map, &output_file).await
+}
+
+async fn write_output<P: AsRef<Path>>(
+    file_map: &HashMap<u64, HashSet<String>>,
+    output_file: &P,
+) -> Result<()> {
+    let file = output_file.open_rw().await?;
+    let mut writer = BufWriter::new(file);
+
+    for (size, list) in file_map {
+        let mut buffer = format!("{size}:");
+        let mut stream = list.iter();
+        if let Some(item) = stream.next() {
+            write!(buffer, "{item}").unwrap();
+        }
+        for item in stream {
+            write!(buffer, ",{item}").unwrap();
+        }
+        writeln!(buffer).unwrap();
+
+        writer.write_all(buffer.as_bytes()).await?;
+    }
+
+    writer.flush().await?;
+
+    Ok(())
 }
