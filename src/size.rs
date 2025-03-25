@@ -1,30 +1,40 @@
-use crate::args::CLI_OPTS;
 use crate::file::FileOps;
 use anyhow::Result;
 use log::{debug, error, trace};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 use tokio::fs::{canonicalize, metadata};
 use walkdir::WalkDir;
 
-pub async fn size_mode() -> Result<(usize, usize)> {
-    let local_path = &CLI_OPTS.local_path;
-    let remote_path = &CLI_OPTS.remote_path.as_ref().expect("Remote Path is None");
+pub async fn size_mode<P: AsRef<Path>>(
+    local_path: P,
+    remote_path: P,
+    commit: bool,
+) -> Result<(usize, usize)> {
+    let local_path = local_path;
+    let remote_path = remote_path;
     let mut file_map = HashMap::new();
     let (mut num_processed, mut num_duplicates) = (0, 0);
 
-    if canonicalize(remote_path).await? == canonicalize(local_path).await? {
+    if canonicalize(&remote_path).await? == canonicalize(&local_path).await? {
         anyhow::bail!(
             "In-place deduplication not yet supported. {} and {} are the same path.",
-            remote_path.display(),
-            local_path.display()
+            remote_path.as_ref().display(),
+            local_path.as_ref().display()
         );
     }
 
-    for entry in WalkDir::new(remote_path) {
+    for entry in WalkDir::new(&remote_path) {
         let remote_file = match entry {
             Ok(file) => file.into_path(),
             Err(e) => {
-                error!("Error while walking {}: {}", remote_path.display(), e);
+                error!(
+                    "Error while walking {}: {}",
+                    remote_path.as_ref().display(),
+                    e
+                );
                 continue;
             }
         };
@@ -40,11 +50,15 @@ pub async fn size_mode() -> Result<(usize, usize)> {
             .insert(remote_file);
     }
 
-    for entry in WalkDir::new(local_path) {
+    for entry in WalkDir::new(&local_path) {
         let local_file = match entry {
             Ok(file) => file.into_path(),
             Err(e) => {
-                error!("Error while walking {}: {}", local_path.display(), e);
+                error!(
+                    "Error while walking {}: {}",
+                    local_path.as_ref().display(),
+                    e
+                );
                 continue;
             }
         };
@@ -71,13 +85,13 @@ pub async fn size_mode() -> Result<(usize, usize)> {
                 let remote_chksum = remote_file.content_chksum().await?;
                 // let remote_chksum = remote_file.content_digest::<sha1::Sha1>().await?;
                 if local_chksum == remote_chksum {
-                    let action = if CLI_OPTS.commit { "remov" } else { "process" };
+                    let action = if commit { "remov" } else { "process" };
                     debug!(
                         "{action}ing duplicate files: local={} remote={}",
                         local_file.display(),
                         remote_file.display()
                     );
-                    if let Err(e) = local_file.remove_file(CLI_OPTS.commit).await {
+                    if let Err(e) = local_file.remove_file(commit).await {
                         error!("Error {action}ing file {}: {e}", local_file.display());
                     }
                     num_duplicates += 1;

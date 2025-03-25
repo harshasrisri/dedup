@@ -46,7 +46,13 @@ async fn main() -> Result<()> {
             &CLI_OPTS.local_path.display(),
             remote_path.display()
         );
-        match size::size_mode().await {
+        match size::size_mode(
+            CLI_OPTS.local_path.to_path_buf(),
+            remote_path.to_path_buf(),
+            CLI_OPTS.commit,
+        )
+        .await
+        {
             Ok(ok) => ok,
             Err(e) => {
                 error!(
