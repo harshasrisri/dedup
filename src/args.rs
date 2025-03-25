@@ -11,15 +11,6 @@ pub struct DedupOpts {
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub verbosity: u8,
 
-    /// File containing list of remote files and hashes
-    #[arg(
-        short = 'R',
-        long = "remote-list",
-        conflicts_with = "remote_path",
-        requires = "hash"
-    )]
-    pub remote_list: Option<PathBuf>,
-
     /// Remote path to use as a reference to filter duplicates in local
     #[arg(short = 'r', long = "remote-path", conflicts_with = "remote_list")]
     pub remote_path: Option<PathBuf>,
@@ -29,8 +20,27 @@ pub struct DedupOpts {
     pub local_path: PathBuf,
 
     /// Type of Hashing algorigthm to use for checksumming.
-    #[arg(short = 'H', long, requires = "remote_list", default_value = "sha1")]
+    #[arg(short = 'H', long, default_value = "sha1")]
     pub hash: HashMode,
+
+    /// File containing list of remote files and hashes
+    #[arg(
+        short = 'R',
+        long = "remote-list",
+        conflicts_with = "remote_path",
+        requires = "hash"
+    )]
+    pub remote_list: Option<PathBuf>,
+
+    /// File to write the output of hash mode analysis
+    #[arg(
+        short = 'o',
+        long = "output-file",
+        conflicts_with_all = [ "remote_path", "remote_list" ],
+        requires = "hash",
+        default_value = "dedup.out"
+    )]
+    pub output_file: PathBuf,
 
     /// Performs a dry run by default. Use this option to commit file deletions
     #[arg(short, long)]
