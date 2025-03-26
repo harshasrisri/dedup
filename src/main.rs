@@ -26,15 +26,15 @@ async fn main() -> Result<()> {
     init_logging()?;
     debug!("{:?}", CLI_OPTS);
 
-    let (num_processed, num_duplicates) = if let Some(remote_list) = CLI_OPTS.input_file.as_ref() {
+    let (num_processed, num_duplicates) = if let Some(input_file) = CLI_OPTS.input_file.as_ref() {
         debug!(
-            "Starting digest mode dedup at {} using remote list {}",
+            "Starting digest mode dedup at {} using input file {}",
             CLI_OPTS.local_path.display(),
-            remote_list.display()
+            input_file.display()
         );
         match digest::digest_mode(
             CLI_OPTS.local_path.to_path_buf(),
-            remote_list.to_path_buf(),
+            input_file.to_path_buf(),
             &CLI_OPTS.digest,
             CLI_OPTS.commit,
         )
@@ -43,9 +43,9 @@ async fn main() -> Result<()> {
             Ok(ok) => ok,
             Err(e) => {
                 error!(
-                    "Digest mode dedup failed at {} using remote list {}. Error: {e}",
+                    "Digest mode dedup failed at {} using input file {}. Error: {e}",
                     CLI_OPTS.local_path.display(),
-                    remote_list.display()
+                    input_file.display()
                 );
                 std::process::exit(1);
             }
@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
         }
     } else {
         debug!(
-            "Starting analysis at {}, using digest algorithm {} and writing out to {}",
+            "Starting digest mode analysis at {}, using {} and writing out to {}",
             canonicalize(&CLI_OPTS.local_path).unwrap().display(),
             CLI_OPTS.digest,
             CLI_OPTS.output_file.display()

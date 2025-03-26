@@ -41,9 +41,9 @@ impl Display for DigestKind {
     }
 }
 
-async fn remote_chksums<P: AsRef<Path>>(remote_list: P) -> Result<HashSet<String>> {
-    let filepath = remote_list.as_ref();
-    let remote: Box<dyn tokio::io::AsyncRead + Unpin> = match filepath
+async fn parse_input<P: AsRef<Path>>(input_file: P) -> Result<HashSet<String>> {
+    let filepath = input_file.as_ref();
+    let reader: Box<dyn tokio::io::AsyncRead + Unpin> = match filepath
         .to_str()
         .ok_or(Error::msg("Error reading filename"))?
     {
@@ -51,7 +51,7 @@ async fn remote_chksums<P: AsRef<Path>>(remote_list: P) -> Result<HashSet<String
         path => Box::new(path.open_ro().await?),
     };
 
-    let mut lines = BufReader::new(remote).lines();
+    let mut lines = BufReader::new(reader).lines();
     let mut ret = HashSet::new();
     while let Some(line) = lines.next_line().await? {
         let line = line.split_whitespace().next().unwrap_or_default();
@@ -62,7 +62,7 @@ async fn remote_chksums<P: AsRef<Path>>(remote_list: P) -> Result<HashSet<String
 
 pub async fn digest_mode<P: AsRef<Path>>(
     local_path: P,
-    remote_list: P,
+    input_file: P,
     digest: &DigestKind,
     commit: bool,
 ) -> Result<(usize, usize)> {
@@ -70,11 +70,11 @@ pub async fn digest_mode<P: AsRef<Path>>(
         anyhow::bail!("Local path not found - {}", local_path.as_ref().display());
     }
 
-    let checksums = remote_chksums(&remote_list).await?;
+    let analysis = parse_input(&input_file).await?;
     info!(
-        "Found {} entries in remote list {}",
-        checksums.len(),
-        remote_list.as_ref().display()
+        "Found {} entries in input file {}",
+        analysis.len(),
+        input_file.as_ref().display()
     );
     let (mut num_processed, mut num_duplicates) = (0, 0);
 
@@ -98,7 +98,7 @@ pub async fn digest_mode<P: AsRef<Path>>(
 
         let chksum = file_path.digest(digest).await?;
 
-        if !checksums.contains(&chksum) {
+        if !analysis.contains(&chksum) {
             debug!("skipping file: {}", file_path.display());
             continue;
         }
