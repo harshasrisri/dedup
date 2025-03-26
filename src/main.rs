@@ -1,6 +1,6 @@
 mod args;
 mod file;
-mod hash;
+mod digest;
 mod size;
 use std::fs::canonicalize;
 
@@ -26,17 +26,16 @@ async fn main() -> Result<()> {
     init_logging()?;
     debug!("{:?}", CLI_OPTS);
 
-    let (num_processed, num_duplicates) = if let Some(remote_list) = CLI_OPTS.remote_list.as_ref() {
+    let (num_processed, num_duplicates) = if let Some(remote_list) = CLI_OPTS.input_file.as_ref() {
         debug!(
-            "Starting hash mode dedup at {} using remote list {}",
+            "Starting digest mode dedup at {} using remote list {}",
             CLI_OPTS.local_path.display(),
             remote_list.display()
         );
-        // hash_mode(local_path: P, remote_list: P, hash: &HashMode, commit: bool)
-        match hash::hash_mode(
+        match digest::digest_mode(
             CLI_OPTS.local_path.to_path_buf(),
             remote_list.to_path_buf(),
-            &CLI_OPTS.hash,
+            &CLI_OPTS.digest,
             CLI_OPTS.commit,
         )
         .await
@@ -44,7 +43,7 @@ async fn main() -> Result<()> {
             Ok(ok) => ok,
             Err(e) => {
                 error!(
-                    "Hash mode dedup failed at {} using remote list {}. Error: {e}",
+                    "Digest mode dedup failed at {} using remote list {}. Error: {e}",
                     CLI_OPTS.local_path.display(),
                     remote_list.display()
                 );
@@ -76,13 +75,13 @@ async fn main() -> Result<()> {
         }
     } else {
         debug!(
-            "Starting analysis at {}, using hashing algorithm {} and writing out to {}",
+            "Starting analysis at {}, using digest algorithm {} and writing out to {}",
             canonicalize(&CLI_OPTS.local_path).unwrap().display(),
-            CLI_OPTS.hash,
+            CLI_OPTS.digest,
             CLI_OPTS.output_file.display()
         );
 
-        hash::analyze_path(&CLI_OPTS.local_path, &CLI_OPTS.hash, &CLI_OPTS.output_file).await?;
+        digest::analyze_path(&CLI_OPTS.local_path, &CLI_OPTS.digest, &CLI_OPTS.output_file).await?;
         return Ok(());
     };
 

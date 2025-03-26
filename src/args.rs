@@ -1,4 +1,4 @@
-use crate::hash::HashMode;
+use crate::digest::DigestKind;
 use clap::Parser;
 use lazy_static::lazy_static;
 use std::path::PathBuf;
@@ -12,32 +12,27 @@ pub struct DedupOpts {
     pub verbosity: u8,
 
     /// Remote path to use as a reference to filter duplicates in local
-    #[arg(short = 'r', long = "remote-path", conflicts_with = "remote_list")]
+    #[arg(short, long, conflicts_with = "input_file")]
     pub remote_path: Option<PathBuf>,
 
     /// Local Path containing files that need to be checked for duplicates
-    #[arg(short = 'l', long = "local-path", default_value = ".")]
+    #[arg(short, long, default_value = ".")]
     pub local_path: PathBuf,
 
-    /// Type of Hashing algorigthm to use for checksumming.
-    #[arg(short = 'H', long, default_value = "sha1")]
-    pub hash: HashMode,
+    /// Type of digest to use for checksumming.
+    #[arg(short, long, default_value = "sha1")]
+    pub digest: DigestKind,
 
-    /// File containing list of remote files and hashes
-    #[arg(
-        short = 'R',
-        long = "remote-list",
-        conflicts_with = "remote_path",
-        requires = "hash"
-    )]
-    pub remote_list: Option<PathBuf>,
+    /// File containing list of remote files and digests
+    #[arg(short, long, conflicts_with = "remote_path", requires = "digest")]
+    pub input_file: Option<PathBuf>,
 
-    /// File to write the output of hash mode analysis
+    /// File to write the output of digest mode analysis
     #[arg(
-        short = 'o',
-        long = "output-file",
-        conflicts_with_all = [ "remote_path", "remote_list" ],
-        requires = "hash",
+        short,
+        long,
+        conflicts_with_all = [ "remote_path", "input_file" ],
+        requires = "digest",
         default_value = "dedup.out"
     )]
     pub output_file: PathBuf,

@@ -7,13 +7,13 @@ use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use twox_hash::XxHash64;
 
-use crate::hash::HashMode;
+use crate::digest::DigestKind;
 
 const CHUNK_SIZE: usize = 4096;
 
 pub trait FileOps: AsRef<Path> {
     fn remove_file(&self, commit: bool) -> impl Future<Output = Result<()>>;
-    fn digest(&self, hash: &HashMode) -> impl Future<Output = Result<String>>;
+    fn digest(&self, digest: &DigestKind) -> impl Future<Output = Result<String>>;
     fn content_chksum(&self) -> impl Future<Output = Result<String>>;
     fn open_ro(&self) -> impl Future<Output = Result<File>>;
     fn open_rw(&self) -> impl Future<Output = Result<File>>;
@@ -43,11 +43,11 @@ where
         Ok(())
     }
 
-    async fn digest(&self, hash: &HashMode) -> Result<String> {
-        match hash {
-            HashMode::MD5 => content_digest::<P, md5::Md5>(self).await,
-            HashMode::SHA1 => content_digest::<P, sha1::Sha1>(self).await,
-            HashMode::SHA2 => content_digest::<P, sha2::Sha256>(self).await,
+    async fn digest(&self, digest: &DigestKind) -> Result<String> {
+        match digest {
+            DigestKind::MD5 => content_digest::<P, md5::Md5>(self).await,
+            DigestKind::SHA1 => content_digest::<P, sha1::Sha1>(self).await,
+            DigestKind::SHA2 => content_digest::<P, sha2::Sha256>(self).await,
         }
     }
 

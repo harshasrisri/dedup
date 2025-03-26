@@ -11,32 +11,32 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone)]
-pub enum HashMode {
+pub enum DigestKind {
     MD5,
     SHA1,
     SHA2,
 }
 
-impl FromStr for HashMode {
+impl FromStr for DigestKind {
     type Err = String;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let hash = s.to_ascii_lowercase();
-        match hash.as_str() {
-            "md5" => Ok(HashMode::MD5),
-            "sha1" | "sha128" => Ok(HashMode::SHA1),
-            "sha2" | "sha256" => Ok(HashMode::SHA2),
-            _ => Err(format!("Unsupported/Invalid hash algorithm: {hash}")),
+        let digest = s.to_ascii_lowercase();
+        match digest.as_str() {
+            "md5" => Ok(DigestKind::MD5),
+            "sha1" | "sha128" => Ok(DigestKind::SHA1),
+            "sha2" | "sha256" => Ok(DigestKind::SHA2),
+            _ => Err(format!("Unsupported/Invalid digest algorithm: {digest}")),
         }
     }
 }
 
-impl Display for HashMode {
+impl Display for DigestKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            HashMode::MD5 => "MD5",
-            HashMode::SHA1 => "SHA1",
-            HashMode::SHA2 => "SHA2",
+            DigestKind::MD5 => "MD5",
+            DigestKind::SHA1 => "SHA1",
+            DigestKind::SHA2 => "SHA2",
         })
     }
 }
@@ -60,10 +60,10 @@ async fn remote_chksums<P: AsRef<Path>>(remote_list: P) -> Result<HashSet<String
     Ok(ret)
 }
 
-pub async fn hash_mode<P: AsRef<Path>>(
+pub async fn digest_mode<P: AsRef<Path>>(
     local_path: P,
     remote_list: P,
-    hash: &HashMode,
+    digest: &DigestKind,
     commit: bool,
 ) -> Result<(usize, usize)> {
     if !local_path.as_ref().exists() {
@@ -97,7 +97,7 @@ pub async fn hash_mode<P: AsRef<Path>>(
         num_processed += 1;
 
         let action = if commit { "remov" } else { "process" };
-        let chksum = file_path.digest(hash).await?;
+        let chksum = file_path.digest(digest).await?;
 
         if !checksums.contains(&chksum) {
             debug!("skipping file: {}", file_path.display());
@@ -116,7 +116,7 @@ pub async fn hash_mode<P: AsRef<Path>>(
 
 pub async fn analyze_path<P: AsRef<Path>>(
     local_path: P,
-    hash: &HashMode,
+    digest: &DigestKind,
     output_file: P,
 ) -> Result<()> {
     if !local_path.as_ref().exists() {
@@ -143,7 +143,7 @@ pub async fn analyze_path<P: AsRef<Path>>(
         }
 
         num_analyzed += 1;
-        let chksum = file_path.digest(hash).await?;
+        let chksum = file_path.digest(digest).await?;
         let size = metadata(&file_path).await?.len();
 
         file_map
