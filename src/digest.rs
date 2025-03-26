@@ -96,7 +96,6 @@ pub async fn digest_mode<P: AsRef<Path>>(
 
         num_processed += 1;
 
-        let action = if commit { "remov" } else { "process" };
         let chksum = file_path.digest(digest).await?;
 
         if !checksums.contains(&chksum) {
@@ -105,8 +104,9 @@ pub async fn digest_mode<P: AsRef<Path>>(
         }
 
         num_duplicates += 1;
-        info!("{action}ing file: {}", file_path.display());
+        info!("duplicate file: {}", file_path.display());
         if let Err(e) = file_path.remove_file(commit).await {
+            let action = if commit { "remov" } else { "process" };
             error!("error {action}ing file {}: {e}", file_path.display());
         }
     }
