@@ -14,7 +14,7 @@ const CHUNK_SIZE: usize = 4096;
 pub trait FileOps: AsRef<Path> {
     fn remove_file(&self, commit: bool) -> impl Future<Output = Result<()>>;
     fn digest(&self, digest: &DigestKind) -> impl Future<Output = Result<String>>;
-    fn content_chksum(&self) -> impl Future<Output = Result<String>>;
+    fn chksum(&self) -> impl Future<Output = Result<String>>;
     fn open_ro(&self) -> impl Future<Output = Result<File>>;
     fn open_rw(&self) -> impl Future<Output = Result<File>>;
 }
@@ -51,7 +51,7 @@ where
         }
     }
 
-    async fn content_chksum(&self) -> Result<String> {
+    async fn chksum(&self) -> Result<String> {
         let mut sh = XxHash64::with_seed(0xdeadbeef);
         let file = self.open_ro().await?;
         let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
