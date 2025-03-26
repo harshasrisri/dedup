@@ -1,6 +1,6 @@
 mod args;
-mod file;
 mod digest;
+mod file;
 mod size;
 use std::fs::canonicalize;
 
@@ -81,7 +81,12 @@ async fn main() -> Result<()> {
             CLI_OPTS.output_file.display()
         );
 
-        digest::analyze_path(&CLI_OPTS.local_path, &CLI_OPTS.digest, &CLI_OPTS.output_file).await?;
+        digest::analyze_path(
+            &CLI_OPTS.local_path,
+            &CLI_OPTS.digest,
+            &CLI_OPTS.output_file,
+        )
+        .await?;
         return Ok(());
     };
 

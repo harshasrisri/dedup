@@ -41,7 +41,7 @@ impl Display for DigestKind {
     }
 }
 
-async fn parse_input<P: AsRef<Path>>(input_file: P) -> Result<HashSet<String>> {
+async fn parse_input<P: AsRef<Path>>(input_file: P) -> Result<HashMap<u64, HashSet<String>>> {
     let filepath = input_file.as_ref();
     let reader: Box<dyn tokio::io::AsyncRead + Unpin> = match filepath
         .to_str()
@@ -52,10 +52,16 @@ async fn parse_input<P: AsRef<Path>>(input_file: P) -> Result<HashSet<String>> {
     };
 
     let mut lines = BufReader::new(reader).lines();
-    let mut ret = HashSet::new();
+    let mut ret = HashMap::new();
     while let Some(line) = lines.next_line().await? {
-        let line = line.split_whitespace().next().unwrap_or_default();
-        ret.insert(line.trim().to_string());
+        let Some((size, digests)) = line.split_once(":") else {
+            anyhow::bail!("Failed to parse input line {line}");
+        };
+        let digests = digests
+            .split(",")
+            .map(|s| s.trim().to_string())
+            .collect::<HashSet<String>>();
+        ret.insert(size.trim().parse()?, digests);
     }
     Ok(ret)
 }
@@ -63,7 +69,7 @@ async fn parse_input<P: AsRef<Path>>(input_file: P) -> Result<HashSet<String>> {
 pub async fn digest_mode<P: AsRef<Path>>(
     local_path: P,
     input_file: P,
-    digest: &DigestKind,
+    digest_kind: &DigestKind,
     commit: bool,
 ) -> Result<(usize, usize)> {
     if !local_path.as_ref().exists() {
@@ -96,11 +102,14 @@ pub async fn digest_mode<P: AsRef<Path>>(
 
         num_processed += 1;
 
-        let chksum = file_path.digest(digest).await?;
+        let size = metadata(&file_path).await?.len();
 
-        if !analysis.contains(&chksum) {
-            debug!("skipping file: {}", file_path.display());
-            continue;
+        if let Some(digests) = analysis.get(&size) {
+            let digest = file_path.digest(digest_kind).await?;
+            if !digests.contains(&digest) {
+                debug!("skipping file: {}", file_path.display());
+                continue;
+            }
         }
 
         num_duplicates += 1;
