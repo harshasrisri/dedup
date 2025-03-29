@@ -110,6 +110,9 @@ pub async fn digest_mode<P: AsRef<Path>>(
                 debug!("skipping file: {}", file_path.display());
                 continue;
             }
+        } else {
+            debug!("skipping file: {}", file_path.display());
+            continue;
         }
 
         num_duplicates += 1;
