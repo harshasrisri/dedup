@@ -96,7 +96,7 @@ pub async fn digest_mode<P: AsRef<Path>>(
             }
         };
 
-        if file_path.is_dir() {
+        if file_path.is_dir() || file_path.is_symlink(){
             continue;
         }
 
@@ -150,7 +150,7 @@ pub async fn analyze_path<P: AsRef<Path>>(
             }
         };
 
-        if file_path.is_dir() {
+        if file_path.is_dir() || file_path.is_symlink(){
             continue;
         }
 
@@ -191,5 +191,6 @@ async fn write_output<P: AsRef<Path>>(
 
     writer.flush().await?;
 
+    debug!("Analysis written to file {}", output_file.as_ref().display());
     Ok(())
 }

@@ -39,7 +39,7 @@ pub async fn size_mode<P: AsRef<Path>>(
             }
         };
 
-        if remote_file.is_dir() {
+        if remote_file.is_dir() || remote_file.is_symlink(){
             continue;
         }
 
@@ -63,7 +63,7 @@ pub async fn size_mode<P: AsRef<Path>>(
             }
         };
 
-        if local_file.is_dir() {
+        if local_file.is_dir() || local_file.is_symlink() {
             continue;
         }
 

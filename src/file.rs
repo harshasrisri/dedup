@@ -9,7 +9,7 @@ use twox_hash::XxHash64;
 
 use crate::digest::DigestKind;
 
-const CHUNK_SIZE: usize = 4096;
+const CHUNK_SIZE: usize = 1024 * 1024;
 
 pub trait FileOps: AsRef<Path> {
     fn remove_file(&self, commit: bool) -> impl Future<Output = Result<()>>;
@@ -82,6 +82,7 @@ async fn content_digest<P, D: Digest>(path: &P) -> Result<String>
 where
     P: AsRef<Path> + ?Sized,
 {
+    trace!("{}: preparing to ingest file", path.as_ref().display());
     let mut sh = D::new();
     let file = path.open_ro().await?;
     let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);

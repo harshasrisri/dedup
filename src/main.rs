@@ -24,7 +24,6 @@ fn init_logging() -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     init_logging()?;
-    debug!("{:?}", CLI_OPTS);
 
     let (num_processed, num_duplicates) = if let Some(input_file) = CLI_OPTS.input_file.as_ref() {
         debug!(
@@ -81,13 +80,24 @@ async fn main() -> Result<()> {
             CLI_OPTS.output_file.display()
         );
 
-        digest::analyze_path(
+        match digest::analyze_path(
             &CLI_OPTS.local_path,
             &CLI_OPTS.digest,
             &CLI_OPTS.output_file,
         )
-        .await?;
-        return Ok(());
+        .await
+        {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                error!(
+                    "Digest mode analysis failed at {} using {} and writing out to {}. Error: {e}",
+                    canonicalize(&CLI_OPTS.local_path).unwrap().display(),
+                    CLI_OPTS.digest,
+                    CLI_OPTS.output_file.display()
+                );
+                std::process::exit(1);
+            }
+        }
     };
 
     println!(
