@@ -16,7 +16,9 @@ fn init_logging() -> Result<()> {
         _ => log::LevelFilter::Trace,
     };
     simple_logger::SimpleLogger::new()
+        .env()
         .with_level(log_level)
+        .without_timestamps()
         .init()?;
     Ok(())
 }
