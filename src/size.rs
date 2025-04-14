@@ -1,4 +1,4 @@
-use crate::file::FileOps;
+use crate::{digest::DigestKind, file::FileOps};
 use anyhow::Result;
 use log::{debug, error, trace};
 use std::{
@@ -79,15 +79,13 @@ pub async fn size_mode<P: AsRef<Path>>(
                 local_file.display(),
                 file_map[&size]
             );
-            let local_chksum = local_file.chksum().await?;
-            // let local_chksum = local_file.content_digest::<sha1::Sha1>().await?;
+            let local_chksum = local_file.digest(&DigestKind::SHA1).await?;
             for remote_file in &file_map[&size] {
-                let remote_chksum = remote_file.chksum().await?;
-                // let remote_chksum = remote_file.content_digest::<sha1::Sha1>().await?;
+                let remote_chksum = remote_file.digest(&DigestKind::SHA1).await?;
                 if local_chksum == remote_chksum {
-                    let action = if commit { "remov" } else { "process" };
+                    let action = if commit { "removing" } else { "found" };
                     debug!(
-                        "{action}ing duplicate files: local={} remote={}",
+                        "{action} duplicate files: local={} remote={}",
                         local_file.display(),
                         remote_file.display()
                     );
