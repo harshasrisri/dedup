@@ -17,6 +17,7 @@ pub trait FileOps: AsRef<Path> {
     fn chksum(&self) -> impl Future<Output = Result<String>>;
     fn open_ro(&self) -> impl Future<Output = Result<File>>;
     fn open_rw(&self) -> impl Future<Output = Result<File>>;
+    fn dup_of(&self, other: &Self) -> impl Future<Output = Result<bool>>;
 }
 
 impl<P> FileOps for P
@@ -75,6 +76,30 @@ where
             .truncate(true)
             .open(self)
             .await?)
+    }
+
+    async fn dup_of(&self, other: &Self) -> Result<bool> {
+        let (this, that) = (self.open_ro().await?, other.open_ro().await?);
+        let mut this = BufReader::with_capacity(CHUNK_SIZE, this);
+        let mut that = BufReader::with_capacity(CHUNK_SIZE, that);
+
+        loop {
+            let this_slice = this.fill_buf().await?;
+            let that_slice = that.fill_buf().await?;
+
+            if this_slice != that_slice {
+                return Ok(false);
+            }
+
+            if this_slice.is_empty() && that_slice.is_empty() {
+                return Ok(true);
+            }
+
+            let (this_len, that_len) = (this_slice.len(), that_slice.len());
+
+            this.consume(this_len);
+            that.consume(that_len);
+        }
     }
 }
 
