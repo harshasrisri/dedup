@@ -1,15 +1,20 @@
 mod args;
+mod analyze;
+mod remote;
+mod local;
+mod inplace;
 mod digest;
 mod file;
 mod size;
 use std::fs::canonicalize;
 
 use anyhow::Result;
-use args::CLI_OPTS;
+use args::{DedupOpts, OperatingMode};
+use clap::Parser;
 use log::{debug, error};
 
-fn init_logging() -> Result<()> {
-    let log_level = match CLI_OPTS.verbosity {
+fn init_logging(verbosity: u8) -> Result<()> {
+    let log_level = match verbosity {
         0 => log::LevelFilter::Warn,
         1 => log::LevelFilter::Info,
         2 => log::LevelFilter::Debug,
@@ -25,88 +30,98 @@ fn init_logging() -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_logging()?;
+    let cli_args = DedupOpts::parse();
+    let (mut num_processed, mut num_duplicates) = (0, 0);
 
-    let (num_processed, num_duplicates) = if let Some(input_file) = CLI_OPTS.input_file.as_ref() {
-        debug!(
-            "Starting digest mode dedup at {} using input file {}",
-            CLI_OPTS.local_path.display(),
-            input_file.display()
-        );
-        match digest::digest_mode(
-            CLI_OPTS.local_path.to_path_buf(),
-            input_file.to_path_buf(),
-            &CLI_OPTS.digest,
-            CLI_OPTS.commit,
-        )
-        .await
-        {
-            Ok(ok) => ok,
-            Err(e) => {
-                error!(
-                    "Digest mode dedup failed at {} using input file {}. Error: {e}",
-                    CLI_OPTS.local_path.display(),
-                    input_file.display()
-                );
-                std::process::exit(1);
-            }
-        }
-    } else if let Some(remote_path) = CLI_OPTS.remote_path.as_ref() {
-        debug!(
-            "Starting size mode dedup as {} using remote path {}",
-            &CLI_OPTS.local_path.display(),
-            remote_path.display()
-        );
-        match size::size_mode(
-            CLI_OPTS.local_path.to_path_buf(),
-            remote_path.to_path_buf(),
-            CLI_OPTS.commit,
-        )
-        .await
-        {
-            Ok(ok) => ok,
-            Err(e) => {
-                error!(
-                    "Size mode dedup failed at {} using remote path {}. Error: {e}",
-                    &CLI_OPTS.local_path.display(),
-                    remote_path.display()
-                );
-                std::process::exit(1);
-            }
-        }
-    } else {
-        debug!(
-            "Starting digest mode analysis at {}, using {} and writing out to {}",
-            canonicalize(&CLI_OPTS.local_path).unwrap().display(),
-            CLI_OPTS.digest,
-            CLI_OPTS.output_file.display()
-        );
+    init_logging(cli_args.verbosity)?;
 
-        match digest::analyze_path(
-            &CLI_OPTS.local_path,
-            &CLI_OPTS.digest,
-            &CLI_OPTS.output_file,
-        )
-        .await
-        {
-            Ok(()) => return Ok(()),
-            Err(e) => {
-                error!(
-                    "Digest mode analysis failed at {} using {} and writing out to {}. Error: {e}",
-                    canonicalize(&CLI_OPTS.local_path).unwrap().display(),
-                    CLI_OPTS.digest,
-                    CLI_OPTS.output_file.display()
-                );
-                std::process::exit(1);
+    match cli_args.mode {
+        OperatingMode::Analyze(args) => {
+            debug!(
+                "Starting digest mode analysis at {}, using {} and writing out to {}",
+                canonicalize(&args.local_path).unwrap().display(),
+                args.digest,
+                args.output_file.display()
+            );
+
+            match digest::analyze_path(
+                &args.local_path,
+                &args.digest,
+                &args.output_file,
+            )
+            .await
+            {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    error!(
+                        "Digest mode analysis failed at {} using {} and writing out to {}. Error: {e}",
+                        canonicalize(args.local_path).unwrap().display(),
+                        args.digest,
+                        args.output_file.display()
+                    );
+                    std::process::exit(1);
+                }
+            };
+        },
+
+        OperatingMode::Remote(args) => {
+            debug!(
+                "Starting digest mode dedup at {} using input file {}",
+                args.local_path.display(),
+                args.input_file.as_ref().unwrap().display()
+            );
+            (num_processed, num_duplicates) = match digest::digest_mode(
+                args.local_path.to_path_buf(),
+                args.input_file.as_ref().unwrap().to_path_buf(),
+                &args.digest,
+                cli_args.commit,
+            )
+            .await
+            {
+                Ok(ok) => ok,
+                Err(e) => {
+                    error!(
+                        "Digest mode dedup failed at {} using input file {}. Error: {e}",
+                        args.local_path.display(),
+                        args.input_file.unwrap().display()
+                    );
+                    std::process::exit(1);
+                }
             }
-        }
+
+        },
+        OperatingMode::Local(args) => {
+            debug!(
+                "Starting size mode dedup as {} using remote path {}",
+                &args.local_path.display(),
+                args.reference_path.as_ref().unwrap().display()
+            );
+            (num_processed, num_duplicates) = match size::size_mode(
+                args.local_path.to_path_buf(),
+                args.reference_path.as_ref().unwrap().to_path_buf(),
+                cli_args.commit,
+            )
+            .await
+            {
+                Ok(ok) => ok,
+                Err(e) => {
+                    error!(
+                        "Size mode dedup failed at {} using remote path {}. Error: {e}",
+                        &args.local_path.display(),
+                        args.reference_path.unwrap().display()
+                    );
+                    std::process::exit(1);
+                }
+            }
+        },
+        OperatingMode::InPlace(_args) => {},
     };
 
     println!(
         "{} files processed. {} Duplicates {}",
         num_processed,
         num_duplicates,
-        if CLI_OPTS.commit {
+        if cli_args.commit {
             "deleted".to_string()
         } else {
             "found".to_string()
