@@ -2,6 +2,7 @@ use crate::digest::DigestKind;
 use crate::file::FileOps;
 use anyhow::Result;
 use clap::Args;
+use futures::{StreamExt, stream};
 use log::{debug, error, info};
 use std::fmt::Write;
 use std::{
@@ -45,30 +46,57 @@ impl Analyze {
         let mut file_map = HashMap::new();
         let mut num_analyzed = 0;
 
-        for entry in WalkDir::new(&self.local_path) {
-            let file_path = match entry {
-                Ok(file) => file.into_path(),
+        let entries = WalkDir::new(&self.local_path)
+            .into_iter()
+            .filter_map(|entry| match entry {
+                Ok(file) => {
+                    let path = file.into_path();
+                    if path.is_dir() || path.is_symlink() {
+                        None
+                    } else {
+                        Some(path)
+                    }
+                }
                 Err(e) => {
                     error!("{}: error while walking: {e}", self.local_path.display());
-                    continue;
+                    None
                 }
-            };
+            });
 
-            if file_path.is_dir() || file_path.is_symlink() {
-                continue;
-            }
+        let digest = self.digest.clone();
 
+        let mut stream = stream::iter(entries)
+            .map(move |file_path| {
+                let digest = digest.clone();
+                async move {
+                    debug!("Start analyzing file: {}", file_path.display());
+                    match async {
+                        let chksum = file_path.digest(&digest).await?;
+                        let size = metadata(&file_path).await?.len();
+                        debug!("Finished analyzing file: {}", file_path.display());
+                        Ok::<_, Box<dyn std::error::Error>>((size, chksum))
+                    }
+                    .await
+                    {
+                        Ok((size, chksum)) => Some((size, chksum)),
+                        Err(e) => {
+                            error!("Error analyzing {}: {e}", file_path.display());
+                            None
+                        }
+                    }
+                }
+            })
+            .buffer_unordered(num_cpus::get() * 4);
+
+        while let Some(Some((size, chksum))) = stream.next().await {
             num_analyzed += 1;
-            let chksum = file_path.digest(&self.digest).await?;
-            let size = metadata(&file_path).await?.len();
-
             file_map
                 .entry(size)
                 .or_insert(HashSet::new())
                 .insert(chksum);
         }
 
-        info!("Analyzed {num_analyzed} files");
+        info!("Analyzed {num_analyzed} files, writing to output...");
         write_output(&file_map, &self.output_file).await
     }
 }
