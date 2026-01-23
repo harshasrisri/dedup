@@ -6,7 +6,6 @@ use dedup::local::Local;
 use dedup::remote::Remote;
 use dedup::size;
 use log::{debug, error};
-use std::fs::canonicalize;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -42,7 +41,7 @@ fn init_logging(verbosity: u8) -> Result<()> {
     simple_logger::SimpleLogger::new()
         .env()
         .with_level(log_level)
-        .without_timestamps()
+        // .without_timestamps()
         .init()?;
     Ok(())
 }
@@ -61,7 +60,7 @@ async fn main() -> Result<()> {
                 Err(e) => {
                     error!(
                         "Digest mode analysis failed at {} using {} and writing out to {}. Error: {e}",
-                        canonicalize(args.local_path).unwrap().display(),
+                        args.local_path.display(),
                         args.digest,
                         args.output_file.display()
                     );

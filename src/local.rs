@@ -6,6 +6,7 @@ use walkdir::WalkDir;
 use std::{collections::{HashMap, HashSet}, path::PathBuf};
 
 use crate::digest::DigestKind;
+use crate::file::FileOps;
 
 #[derive(Args, Debug)]
 #[command(arg_required_else_help = true)]
