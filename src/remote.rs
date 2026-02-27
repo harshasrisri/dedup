@@ -16,7 +16,7 @@ use walkdir::WalkDir;
 #[command(arg_required_else_help = true)]
 /// Uses analysis from a file to dedup files
 pub struct Remote {
-    /// File containing digest-mode analysis used to dedup files in local_path
+    /// File containing digest-mode analysis used to dedup files in `local_path`
     #[arg(short, long, requires = "digest")]
     pub input_file: Option<PathBuf>,
 
@@ -102,11 +102,11 @@ async fn parse_input<P: AsRef<Path>>(input_file: P) -> Result<HashMap<u64, HashS
     let mut lines = BufReader::new(reader).lines();
     let mut ret = HashMap::new();
     while let Some(line) = lines.next_line().await? {
-        let Some((size, digests)) = line.split_once(":") else {
+        let Some((size, digests)) = line.split_once(':') else {
             anyhow::bail!("Failed to parse input line {line}");
         };
         let digests = digests
-            .split(",")
+            .split(',')
             .map(|s| s.trim().to_string())
             .collect::<HashSet<String>>();
         ret.insert(size.trim().parse()?, digests);

@@ -1,9 +1,12 @@
 use anyhow::Result;
 use clap::Args;
 use log::{debug, error, trace};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 use tokio::fs::{canonicalize, metadata};
 use walkdir::WalkDir;
-use std::{collections::{HashMap, HashSet}, path::PathBuf};
 
 use crate::digest::DigestKind;
 use crate::file::FileOps;
@@ -40,15 +43,11 @@ impl Local {
             );
         }
 
-        for entry in WalkDir::new(&remote_path) {
+        for entry in WalkDir::new(remote_path) {
             let remote_file = match entry {
                 Ok(file) => file.into_path(),
                 Err(e) => {
-                    error!(
-                        "Error while walking {}: {}",
-                        remote_path.display(),
-                        e
-                    );
+                    error!("Error while walking {}: {}", remote_path.display(), e);
                     continue;
                 }
             };
@@ -68,11 +67,7 @@ impl Local {
             let local_file = match entry {
                 Ok(file) => file.into_path(),
                 Err(e) => {
-                    error!(
-                        "Error while walking {}: {}",
-                        self.local_path.display(),
-                        e
-                    );
+                    error!("Error while walking {}: {}", self.local_path.display(), e);
                     continue;
                 }
             };

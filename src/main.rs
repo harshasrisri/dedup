@@ -70,8 +70,7 @@ async fn main() -> Result<()> {
         }
 
         OperatingMode::Remote(args) => {
-            (num_processed, num_duplicates) = match args.dedup(cli_args.commit).await
-            {
+            (num_processed, num_duplicates) = match args.dedup(cli_args.commit).await {
                 Ok(ok) => ok,
                 Err(e) => {
                     error!(
@@ -91,8 +90,8 @@ async fn main() -> Result<()> {
                 args.reference_path.as_ref().unwrap().display()
             );
             (num_processed, num_duplicates) = match size::size_mode(
-                args.local_path.to_path_buf(),
-                args.reference_path.as_ref().unwrap().to_path_buf(),
+                args.local_path.clone(),
+                args.reference_path.as_ref().unwrap().clone(),
                 cli_args.commit,
             )
             .await
@@ -110,7 +109,7 @@ async fn main() -> Result<()> {
         }
 
         OperatingMode::InPlace(_args) => {}
-    };
+    }
 
     println!(
         "{} files processed. {} Duplicates {}",
