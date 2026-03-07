@@ -1,5 +1,5 @@
 use crate::{digest::DigestKind, file::DirOps, file::FileOps};
-use anyhow::{Error, Result};
+use anyhow::Result;
 use clap::Args;
 use futures::{StreamExt, stream};
 use log::{debug, error, info};
@@ -104,12 +104,10 @@ async fn parse_input<P: AsRef<Path>>(
 ) -> Result<(HashMap<u64, HashSet<String>>, usize)> {
     let filepath = input_file.as_ref();
     let mut entry_count = 0;
-    let reader: Box<dyn tokio::io::AsyncRead + Unpin> = match filepath
-        .to_str()
-        .ok_or(Error::msg("Error reading filename"))?
-    {
-        "-" => Box::new(tokio::io::stdin()),
-        path => Box::new(path.open_ro().await?),
+    let reader: Box<dyn tokio::io::AsyncRead + Unpin> = match filepath.to_str() {
+        Some("-") => Box::new(tokio::io::stdin()),
+        Some(path) => Box::new(path.open_ro().await?),
+        None => anyhow::bail!("Invalid filename"),
     };
 
     let mut lines = BufReader::new(reader).lines();

@@ -12,13 +12,14 @@ use crate::digest::DigestKind;
 
 const CHUNK_SIZE: usize = 1024 * 1024;
 
+#[allow(async_fn_in_trait)]
 pub trait FileOps: AsRef<Path> {
-    fn remove_file(&self, commit: bool) -> impl Future<Output = Result<()>>;
-    fn digest(&self, digest: &DigestKind) -> impl Future<Output = Result<String>>;
-    fn chksum(&self) -> impl Future<Output = Result<String>>;
-    fn open_ro(&self) -> impl Future<Output = Result<File>>;
-    fn open_rw(&self) -> impl Future<Output = Result<File>>;
-    fn dup_of(&self, other: &Self) -> impl Future<Output = Result<bool>>;
+    async fn remove_file(&self, commit: bool) -> Result<()>;
+    async fn digest(&self, digest: &DigestKind) -> Result<String>;
+    async fn chksum(&self) -> Result<String>;
+    async fn open_ro(&self) -> Result<File>;
+    async fn open_rw(&self) -> Result<File>;
+    async fn dup_of(&self, other: &Self) -> Result<bool>;
 }
 
 impl<P> FileOps for P
@@ -139,21 +140,12 @@ where
     P: AsRef<Path> + ?Sized,
 {
     fn walkdir(&self) -> impl Iterator<Item = PathBuf> {
-        WalkDir::new(self)
-            .into_iter()
-            .filter_map(|entry| match entry {
-                Ok(file) => {
-                    let path = file.into_path();
-                    if path.is_dir() || path.is_symlink() {
-                        None
-                    } else {
-                        Some(path)
-                    }
-                }
-                Err(e) => {
-                    error!("{}: error while walking: {e}", self.as_ref().display());
-                    None
-                }
-            })
+        WalkDir::new(self).into_iter().filter_map(|entry| {
+            let path = entry
+                .inspect_err(|e| error!("{}: error while walking: {e}", self.as_ref().display()))
+                .ok()?
+                .into_path();
+            (!path.is_symlink() && !path.is_dir()).then_some(path)
+        })
     }
 }

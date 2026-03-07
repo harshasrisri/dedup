@@ -18,7 +18,7 @@ log = "0.4.26"
 simple_logger = "5.0"
 clap = { version = "4.5.32", features = ["derive"] }
 twox-hash = "2.1.0"
-tokio = { version = "1.44.1", features = ["full"] }
+tokio = { version = "1.44.1", features = [ "fs", "io-util", "io-std", "rt-multi-thread", "macros", "sync" ] }
 futures = "0.3.31"
 tokio-stream = { version = "0.1.17", features = ["full"] }
 num_cpus = "1.17.0"
