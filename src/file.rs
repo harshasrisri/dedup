@@ -1,11 +1,12 @@
 use anyhow::Result;
 use digest::Digest;
-use log::trace;
+use log::{error, trace};
 use std::hash::Hasher;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use twox_hash::XxHash64;
+use walkdir::WalkDir;
 
 use crate::digest::DigestKind;
 
@@ -127,4 +128,32 @@ where
     }
     trace!("{}: digested {file_size} bytes", path.as_ref().display());
     Ok(hex::encode(sh.result()))
+}
+
+pub trait DirOps {
+    fn walkdir(&self) -> impl Iterator<Item = PathBuf>;
+}
+
+impl<P> DirOps for P
+where
+    P: AsRef<Path> + ?Sized,
+{
+    fn walkdir(&self) -> impl Iterator<Item = PathBuf> {
+        WalkDir::new(self)
+            .into_iter()
+            .filter_map(|entry| match entry {
+                Ok(file) => {
+                    let path = file.into_path();
+                    if path.is_dir() || path.is_symlink() {
+                        None
+                    } else {
+                        Some(path)
+                    }
+                }
+                Err(e) => {
+                    error!("{}: error while walking: {e}", self.as_ref().display());
+                    None
+                }
+            })
+    }
 }

@@ -1,4 +1,5 @@
 use crate::digest::DigestKind;
+use crate::file::DirOps;
 use crate::file::FileOps;
 use anyhow::Result;
 use clap::Args;
@@ -11,7 +12,6 @@ use std::{
 };
 use tokio::fs::{canonicalize, metadata};
 use tokio::io::{AsyncWriteExt, BufWriter};
-use walkdir::WalkDir;
 
 #[derive(Args, Debug)]
 #[command(arg_required_else_help = true)]
@@ -46,23 +46,7 @@ impl Analyze {
         let mut file_map = HashMap::new();
         let mut num_analyzed = 0;
 
-        let entries = WalkDir::new(&self.local_path)
-            .into_iter()
-            .filter_map(|entry| match entry {
-                Ok(file) => {
-                    let path = file.into_path();
-                    if path.is_dir() || path.is_symlink() {
-                        None
-                    } else {
-                        Some(path)
-                    }
-                }
-                Err(e) => {
-                    error!("{}: error while walking: {e}", self.local_path.display());
-                    None
-                }
-            });
-
+        let entries = self.local_path.walkdir();
         let digest = self.digest.clone();
 
         let mut stream = stream::iter(entries)

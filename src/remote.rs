@@ -1,16 +1,17 @@
-use crate::{digest::DigestKind, file::FileOps};
+use crate::{digest::DigestKind, file::DirOps, file::FileOps};
 use anyhow::{Error, Result};
 use clap::Args;
+use futures::{StreamExt, stream};
 use log::{debug, error, info};
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tokio::{
     fs::metadata,
     io::{AsyncBufReadExt, BufReader},
 };
-use walkdir::WalkDir;
 
 #[derive(Args, Debug)]
 #[command(arg_required_else_help = true)]
@@ -41,47 +42,56 @@ impl Remote {
             anyhow::bail!("Local path not found - {}", self.local_path.display());
         }
 
-        let analysis = parse_input(&self.input_file.as_ref().unwrap()).await?;
+        let entries = self.local_path.walkdir();
+        let digest = self.digest.clone();
+
+        let mut stream = stream::iter(entries)
+            .map(move |file_path| {
+                let digest = digest.clone();
+                async move {
+                    debug!("Start analyzing file: {}", file_path.display());
+                    let file_path_clone = file_path.clone();
+                    match async {
+                        let chksum = file_path.digest(&digest).await?;
+                        let size = metadata(&file_path).await?.len();
+                        debug!("Finished analyzing file: {}", file_path.display());
+                        Ok::<_, Box<dyn std::error::Error>>((size, chksum, file_path))
+                    }
+                    .await
+                    {
+                        Ok((size, chksum, file_path)) => Some((size, chksum, file_path)),
+                        Err(e) => {
+                            error!("Error analyzing {}: {e}", file_path_clone.display());
+                            None
+                        }
+                    }
+                }
+            })
+            .buffer_unordered(num_cpus::get() * 4);
+
+        let (analysis, entries) = parse_input(&self.input_file.as_ref().unwrap()).await?;
+        let analysis = Arc::new(analysis);
         info!(
             "Found {} entries in input file {}",
-            analysis.len(),
+            entries,
             self.input_file.as_ref().unwrap().display()
         );
-        let (mut num_processed, mut num_duplicates) = (0, 0);
 
-        for entry in WalkDir::new(&self.local_path) {
-            let file_path = match entry {
-                Ok(file) => file.into_path(),
-                Err(e) => {
-                    error!("{}: error while walking: {e}", self.local_path.display());
-                    continue;
-                }
-            };
-
-            if file_path.is_dir() || file_path.is_symlink() {
-                continue;
-            }
-
+        let (mut num_processed, mut num_duplicates) = (0, 0); //entries.size_hint().0;
+        while let Some(Some((size, chksum, file_path))) = stream.next().await {
             num_processed += 1;
-
-            let size = metadata(&file_path).await?.len();
-
-            if let Some(digests) = analysis.get(&size) {
-                let digest = file_path.digest(&self.digest).await?;
-                if !digests.contains(&digest) {
-                    debug!("skipping file: {}", file_path.display());
-                    continue;
+            if let Some(chksums) = analysis.get(&size)
+                && chksums.contains(&chksum)
+            {
+                num_duplicates += 1;
+                let action = if commit { "remov" } else { "process" };
+                if let Err(e) = file_path.remove_file(commit).await {
+                    error!("error {action}ing file {}: {e}", file_path.display());
+                } else {
+                    debug!("successfully {action}ed file {}", file_path.display());
                 }
             } else {
                 debug!("skipping file: {}", file_path.display());
-                continue;
-            }
-
-            num_duplicates += 1;
-            info!("duplicate file: {}", file_path.display());
-            if let Err(e) = file_path.remove_file(commit).await {
-                let action = if commit { "remov" } else { "process" };
-                error!("error {action}ing file {}: {e}", file_path.display());
             }
         }
 
@@ -89,8 +99,11 @@ impl Remote {
     }
 }
 
-async fn parse_input<P: AsRef<Path>>(input_file: P) -> Result<HashMap<u64, HashSet<String>>> {
+async fn parse_input<P: AsRef<Path>>(
+    input_file: P,
+) -> Result<(HashMap<u64, HashSet<String>>, usize)> {
     let filepath = input_file.as_ref();
+    let mut entry_count = 0;
     let reader: Box<dyn tokio::io::AsyncRead + Unpin> = match filepath
         .to_str()
         .ok_or(Error::msg("Error reading filename"))?
@@ -109,7 +122,8 @@ async fn parse_input<P: AsRef<Path>>(input_file: P) -> Result<HashMap<u64, HashS
             .split(',')
             .map(|s| s.trim().to_string())
             .collect::<HashSet<String>>();
+        entry_count += digests.len();
         ret.insert(size.trim().parse()?, digests);
     }
-    Ok(ret)
+    Ok((ret, entry_count))
 }
