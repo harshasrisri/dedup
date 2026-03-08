@@ -1,4 +1,4 @@
-use crate::{digest::DigestKind, file::DirOps, file::FileOps};
+use crate::{digest::{DigestFile, DigestKind}, file::{DirOps, FileOps}};
 use anyhow::Result;
 use clap::Args;
 use futures::{StreamExt, stream};
@@ -52,7 +52,7 @@ impl Remote {
                     debug!("Start analyzing file: {}", file_path.display());
                     let file_path_clone = file_path.clone();
                     match async {
-                        let chksum = file_path.digest(&digest).await?;
+                        let chksum = file_path.digest(digest)?;
                         let size = metadata(&file_path).await?.len();
                         debug!("Finished analyzing file: {}", file_path.display());
                         Ok::<_, Box<dyn std::error::Error>>((size, chksum, file_path))

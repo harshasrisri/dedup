@@ -1,4 +1,4 @@
-use crate::digest::DigestKind;
+use crate::digest::{DigestFile, DigestKind};
 use crate::file::DirOps;
 use crate::file::FileOps;
 use anyhow::Result;
@@ -55,7 +55,7 @@ impl Analyze {
                 async move {
                     debug!("Start analyzing file: {}", file_path.display());
                     match async {
-                        let chksum = file_path.digest(&digest).await?;
+                        let chksum = file_path.digest(digest)?;
                         let size = metadata(&file_path).await?.len();
                         debug!("Finished analyzing file: {}", file_path.display());
                         Ok::<_, Box<dyn std::error::Error>>((size, chksum))

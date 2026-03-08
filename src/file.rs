@@ -1,5 +1,4 @@
 use anyhow::Result;
-use digest::Digest;
 use log::{error, trace};
 use std::hash::Hasher;
 use std::path::{Path, PathBuf};
@@ -8,14 +7,11 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use twox_hash::XxHash64;
 use walkdir::WalkDir;
 
-use crate::digest::DigestKind;
-
 const CHUNK_SIZE: usize = 1024 * 1024;
 
 #[allow(async_fn_in_trait)]
 pub trait FileOps: AsRef<Path> {
     async fn remove_file(&self, commit: bool) -> Result<()>;
-    async fn digest(&self, digest: &DigestKind) -> Result<String>;
     async fn chksum(&self) -> Result<String>;
     async fn open_ro(&self) -> Result<File>;
     async fn open_rw(&self) -> Result<File>;
@@ -44,14 +40,6 @@ where
             trace!("{}: candidate for removal", self.as_ref().display());
         }
         Ok(())
-    }
-
-    async fn digest(&self, digest: &DigestKind) -> Result<String> {
-        match digest {
-            DigestKind::MD5 => content_digest::<P, md5::Md5>(self).await,
-            DigestKind::SHA1 => content_digest::<P, sha1::Sha1>(self).await,
-            DigestKind::SHA2 => content_digest::<P, sha2::Sha256>(self).await,
-        }
     }
 
     async fn chksum(&self) -> Result<String> {
@@ -103,32 +91,6 @@ where
             that.consume(that_len);
         }
     }
-}
-
-async fn content_digest<P, D: Digest>(path: &P) -> Result<String>
-where
-    P: AsRef<Path> + ?Sized,
-{
-    trace!("{}: preparing to ingest file", path.as_ref().display());
-    let mut sh = D::new();
-    let file = path.open_ro().await?;
-    let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
-    let mut file_size = 0;
-
-    while let Ok(slice) = reader.fill_buf().await {
-        let len = slice.len();
-        if len != 0 {
-            sh.input(slice);
-            trace!("{}: ingesting {len} bytes", path.as_ref().display());
-            file_size += len;
-            let _ = slice;
-        } else {
-            break;
-        }
-        reader.consume(len);
-    }
-    trace!("{}: digested {file_size} bytes", path.as_ref().display());
-    Ok(hex::encode(sh.result()))
 }
 
 pub trait DirOps {
