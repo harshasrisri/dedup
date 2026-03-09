@@ -1,4 +1,4 @@
-use crate::{digest::DigestFile, file::{DirOps, FileOps}};
+use crate::{hasher::HashFile, file::{DirOps, FileOps}};
 use anyhow::Result;
 use clap::Args;
 use futures::{StreamExt, stream};
@@ -17,8 +17,8 @@ use tokio::{
 #[command(arg_required_else_help = true)]
 /// Uses analysis from a file to dedup files
 pub struct Remote {
-    /// File containing digest-mode analysis used to dedup files in `local_path`
-    #[arg(short, long, requires = "digest")]
+    /// File containing hash analysis used to dedup files in `local_path`
+    #[arg(short, long)]
     pub input_file: Option<PathBuf>,
 
     /// Local Path containing files that need to be checked for duplicates
@@ -29,7 +29,7 @@ pub struct Remote {
 impl Remote {
     pub async fn dedup(&self, commit: bool) -> Result<(usize, usize)> {
         debug!(
-            "Starting digest mode dedup at {} using input file {}",
+            "Starting remote mode dedup at {} using input file {}",
             self.local_path.display(),
             self.input_file.as_ref().unwrap().display()
         );
@@ -107,15 +107,15 @@ async fn parse_input<P: AsRef<Path>>(
     let mut lines = BufReader::new(reader).lines();
     let mut ret = HashMap::new();
     while let Some(line) = lines.next_line().await? {
-        let Some((size, digests)) = line.split_once(':') else {
+        let Some((size, hashes)) = line.split_once(':') else {
             anyhow::bail!("Failed to parse input line {line}");
         };
-        let digests = digests
+        let hashes = hashes
             .split(',')
             .map(|s| s.trim().to_string())
             .collect::<HashSet<String>>();
-        entry_count += digests.len();
-        ret.insert(size.trim().parse()?, digests);
+        entry_count += hashes.len();
+        ret.insert(size.trim().parse()?, hashes);
     }
     Ok((ret, entry_count))
 }

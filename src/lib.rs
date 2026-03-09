@@ -1,5 +1,5 @@
 pub mod analyze;
-pub mod digest;
+pub mod hasher;
 pub mod file;
 pub mod inplace;
 pub mod local;

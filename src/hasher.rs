@@ -32,11 +32,11 @@ impl<R: Read> Iterator for BufChunkIterator<R> {
     }
 }
 
-pub trait DigestFile: AsRef<Path> {
+pub trait HashFile: AsRef<Path> {
     fn chksum(&self) -> Result<String>;
 }
 
-impl<P> DigestFile for P
+impl<P> HashFile for P
 where 
     P: AsRef<Path>,
 {

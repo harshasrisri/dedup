@@ -8,7 +8,7 @@ use std::{
 use tokio::fs::{canonicalize, metadata};
 use walkdir::WalkDir;
 
-use crate::digest::DigestFile;
+use crate::hasher::HashFile;
 use crate::file::FileOps;
 
 #[derive(Args, Debug)]

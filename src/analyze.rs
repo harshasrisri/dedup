@@ -1,4 +1,4 @@
-use crate::digest::DigestFile;
+use crate::hasher::HashFile;
 use crate::file::DirOps;
 use crate::file::FileOps;
 use anyhow::Result;
@@ -17,8 +17,8 @@ use tokio::io::{AsyncWriteExt, BufWriter};
 #[command(arg_required_else_help = true)]
 /// Analyzes path and writes data to file to be used elsewhere
 pub struct Analyze {
-    /// File to write the output of digest-mode analysis
-    #[arg(short, long, requires = "digest", default_value = "dedup.out")]
+    /// File to write the output of hash analysis
+    #[arg(short, long, default_value = "dedup.out")]
     pub output_file: PathBuf,
 
     /// Local Path containing files that need to be checked for duplicates
@@ -29,7 +29,7 @@ pub struct Analyze {
 impl Analyze {
     pub async fn analyze(&self) -> Result<()> {
         debug!(
-            "Starting digest mode analysis at {}, and writing out to {}",
+            "Starting analysis at {}, and writing out to {}",
             canonicalize(&self.local_path).await.unwrap().display(),
             self.output_file.display()
         );
