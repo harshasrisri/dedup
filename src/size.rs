@@ -1,4 +1,4 @@
-use crate::{hasher::HashFile, file::FileOps};
+use crate::{hasher::HashFile, fs::FileOps};
 use anyhow::Result;
 use log::{debug, error, trace};
 use std::{

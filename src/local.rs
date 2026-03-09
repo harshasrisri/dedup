@@ -9,7 +9,7 @@ use tokio::fs::{canonicalize, metadata};
 use walkdir::WalkDir;
 
 use crate::hasher::HashFile;
-use crate::file::FileOps;
+use crate::fs::{DirOps, FileOps};
 
 #[derive(Args, Debug)]
 #[command(arg_required_else_help = true)]

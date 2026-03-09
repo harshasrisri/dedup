@@ -1,4 +1,4 @@
-use crate::{hasher::HashFile, file::{DirOps, FileOps}};
+use crate::{hasher::HashFile, fs::{DirOps, FileOps}};
 use anyhow::Result;
 use clap::Args;
 use futures::{StreamExt, stream};
@@ -63,11 +63,11 @@ impl Remote {
             })
             .buffer_unordered(num_cpus::get() * 4);
 
-        let (analysis, entries) = parse_input(&self.input_file.as_ref().unwrap()).await?;
+        let (analysis, num_entries) = parse_input(&self.input_file.as_ref().unwrap()).await?;
         let analysis = Arc::new(analysis);
         info!(
             "Found {} entries in input file {}",
-            entries,
+            num_entries,
             self.input_file.as_ref().unwrap().display()
         );
 

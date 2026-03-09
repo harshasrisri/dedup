@@ -1,4 +1,4 @@
-use dedup::file::FileOps;
+use dedup::fs::FileOps;
 use std::path::PathBuf;
 
 #[test]

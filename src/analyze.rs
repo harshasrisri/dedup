@@ -1,6 +1,6 @@
 use crate::hasher::HashFile;
-use crate::file::DirOps;
-use crate::file::FileOps;
+use crate::fs::DirOps;
+use crate::fs::FileOps;
 use anyhow::Result;
 use clap::Args;
 use futures::{StreamExt, stream};
