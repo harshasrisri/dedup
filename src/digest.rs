@@ -1,7 +1,9 @@
 use anyhow::Result;
+use twox_hash::XxHash64;
+use std::hash::Hasher;
 use std::{fmt::Display, path::Path, str::FromStr};
 use std::fs::OpenOptions;
-use std::io::Read;
+use std::io::{BufReader, Read};
 
 #[derive(Debug, Clone)]
 pub enum DigestKind {
@@ -67,6 +69,7 @@ impl<R: Read> Iterator for BufChunkIterator<R> {
 
 pub trait DigestFile: AsRef<Path> {
     fn digest(&self, digest: DigestKind) -> Result<String>;
+    fn chksum(&self) -> Result<String>;
 }
 
 impl<P> DigestFile for P
@@ -79,6 +82,21 @@ where
             DigestKind::SHA1 => content_digest::<P, sha1::Sha1>(self),
             DigestKind::SHA2 => content_digest::<P, sha2::Sha256>(self),
         }
+    }
+
+    fn chksum(&self) -> Result<String> {
+        let mut sh = XxHash64::with_seed(0xdeadbeef);
+        let file = OpenOptions::new().read(true).write(false).create(false).open(self)?;
+        let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
+        let mut buffer = Vec::with_capacity(CHUNK_SIZE);
+
+        while let Ok(size) = reader.read(&mut buffer) {
+            if size == 0 {
+                break;
+            }
+            sh.write(&buffer);
+        }
+        Ok(format!("{:X}", sh.finish()))
     }
 }
 

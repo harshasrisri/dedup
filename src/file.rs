@@ -1,10 +1,8 @@
 use anyhow::Result;
 use log::{error, trace};
-use std::hash::Hasher;
 use std::path::{Path, PathBuf};
 use tokio::fs::{File, OpenOptions};
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
-use twox_hash::XxHash64;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use walkdir::WalkDir;
 
 const CHUNK_SIZE: usize = 1024 * 1024;
@@ -12,7 +10,6 @@ const CHUNK_SIZE: usize = 1024 * 1024;
 #[allow(async_fn_in_trait)]
 pub trait FileOps: AsRef<Path> {
     async fn remove_file(&self, commit: bool) -> Result<()>;
-    async fn chksum(&self) -> Result<String>;
     async fn open_ro(&self) -> Result<File>;
     async fn open_rw(&self) -> Result<File>;
     async fn dup_of(&self, other: &Self) -> Result<bool>;
@@ -40,21 +37,6 @@ where
             trace!("{}: candidate for removal", self.as_ref().display());
         }
         Ok(())
-    }
-
-    async fn chksum(&self) -> Result<String> {
-        let mut sh = XxHash64::with_seed(0xdeadbeef);
-        let file = self.open_ro().await?;
-        let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
-        let mut buffer = Vec::with_capacity(CHUNK_SIZE);
-
-        while let Ok(size) = reader.read(&mut buffer).await {
-            if size == 0 {
-                break;
-            }
-            sh.write(&buffer);
-        }
-        Ok(format!("{:X}", sh.finish()))
     }
 
     async fn open_rw(&self) -> Result<File> {
