@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Args;
-use log::{debug, error, trace};
+use futures::{stream, StreamExt};
+use log::{debug, error, trace, warn};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -43,24 +44,23 @@ impl Local {
             );
         }
 
-        for entry in WalkDir::new(remote_path) {
-            let remote_file = match entry {
-                Ok(file) => file.into_path(),
-                Err(e) => {
-                    error!("Error while walking {}: {}", remote_path.display(), e);
-                    continue;
+        let entries = remote_path.walkdir();
+        let mut stream = stream::iter(entries)
+            .map(move |path| {
+                async move {
+                    metadata(&path).await
+                        .inspect_err(|e| warn!("Error reading file info {}: {e}", path.display()))
+                        .map(|md| (md.len(), path))
+                        .ok()
                 }
-            };
+            })
+            .buffer_unordered(num_cpus::get() * 4);
 
-            if remote_file.is_dir() || remote_file.is_symlink() {
-                continue;
-            }
-
-            let size = metadata(&remote_file).await?.len();
+        while let Some(Some((size, path))) = stream.next().await {
             file_map
                 .entry(size)
                 .or_insert(HashSet::new())
-                .insert(remote_file);
+                .insert(path);
         }
 
         for entry in WalkDir::new(&self.local_path) {
