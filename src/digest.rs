@@ -24,7 +24,7 @@ impl<R: Read> Iterator for BufChunkIterator<R> {
             .read_to_end(&mut buffer)
             .ok();
         if len != Some(0) {
-            len.map(|len| buffer.truncate(len));
+            if let Some(len) = len { buffer.truncate(len) }
             Some(buffer)
         } else {
             None
@@ -42,15 +42,10 @@ where
 {
     fn chksum(&self) -> Result<String> {
         let mut sh = XxHash64::with_seed(0xdeadbeef);
-        let file = OpenOptions::new().read(true).write(false).create(false).open(self)?;
-        let mut reader = BufReader::with_capacity(CHUNK_SIZE, file);
-        let mut buffer = Vec::with_capacity(CHUNK_SIZE);
-
-        while let Ok(size) = reader.read(&mut buffer) {
-            if size == 0 {
-                break;
-            }
-            sh.write(&buffer);
+        let inner = OpenOptions::new().read(true).write(false).create(false).open(self)?;
+        let chunk_iter = BufChunkIterator { inner, chunk_size: CHUNK_SIZE };
+        for chunk in chunk_iter {
+            sh.write(&chunk);
         }
 
         Ok(format!("{:X}", sh.finish()))
