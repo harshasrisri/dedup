@@ -1,4 +1,4 @@
-use crate::digest::{DigestFile, DigestKind};
+use crate::digest::DigestFile;
 use crate::file::DirOps;
 use crate::file::FileOps;
 use anyhow::Result;
@@ -24,18 +24,13 @@ pub struct Analyze {
     /// Local Path containing files that need to be checked for duplicates
     #[arg(short, long, default_value = ".")]
     pub local_path: PathBuf,
-
-    /// Type of digest to use to parse/generate digest-mode analysis
-    #[arg(short, long, default_value = "sha1")]
-    pub digest: DigestKind,
 }
 
 impl Analyze {
     pub async fn analyze(&self) -> Result<()> {
         debug!(
-            "Starting digest mode analysis at {}, using {} and writing out to {}",
+            "Starting digest mode analysis at {}, and writing out to {}",
             canonicalize(&self.local_path).await.unwrap().display(),
-            self.digest,
             self.output_file.display()
         );
 
@@ -47,15 +42,13 @@ impl Analyze {
         let mut num_analyzed = 0;
 
         let entries = self.local_path.walkdir();
-        let digest = self.digest.clone();
 
         let mut stream = stream::iter(entries)
             .map(move |file_path| {
-                let digest = digest.clone();
                 async move {
                     debug!("Start analyzing file: {}", file_path.display());
                     match async {
-                        let chksum = file_path.digest(digest)?;
+                        let chksum = file_path.chksum()?;
                         let size = metadata(&file_path).await?.len();
                         debug!("Finished analyzing file: {}", file_path.display());
                         Ok::<_, Box<dyn std::error::Error>>((size, chksum))

@@ -1,44 +1,9 @@
 use anyhow::Result;
 use twox_hash::XxHash64;
 use std::hash::Hasher;
-use std::{fmt::Display, path::Path, str::FromStr};
+use std::path::Path;
 use std::fs::OpenOptions;
-use std::io::{BufReader, Read};
-
-#[derive(Debug, Clone)]
-pub enum DigestKind {
-    MD5,
-    SHA1,
-    SHA2,
-}
-
-impl FromStr for DigestKind {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let digest = s.to_ascii_lowercase();
-        match digest.as_str() {
-            "md5" => Ok(Self::MD5),
-            "sha1" | "sha128" => Ok(Self::SHA1),
-            "sha2" | "sha256" => Ok(Self::SHA2),
-            _ => Err(format!("Unsupported/Invalid digest algorithm: {digest}")),
-        }
-    }
-}
-
-impl Display for DigestKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::MD5 => "MD5",
-                Self::SHA1 => "SHA1",
-                Self::SHA2 => "SHA2",
-            }
-        )
-    }
-}
+use std::io::Read;
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -68,7 +33,6 @@ impl<R: Read> Iterator for BufChunkIterator<R> {
 }
 
 pub trait DigestFile: AsRef<Path> {
-    fn digest(&self, digest: DigestKind) -> Result<String>;
     fn chksum(&self) -> Result<String>;
 }
 
@@ -76,14 +40,6 @@ impl<P> DigestFile for P
 where 
     P: AsRef<Path>,
 {
-    fn digest(&self, digest: DigestKind) -> Result<String> {
-        match digest {
-            DigestKind::MD5 => content_digest::<P, md5::Md5>(self),
-            DigestKind::SHA1 => content_digest::<P, sha1::Sha1>(self),
-            DigestKind::SHA2 => content_digest::<P, sha2::Sha256>(self),
-        }
-    }
-
     fn chksum(&self) -> Result<String> {
         let mut sh = XxHash64::with_seed(0xdeadbeef);
         let file = OpenOptions::new().read(true).write(false).create(false).open(self)?;
@@ -96,20 +52,7 @@ where
             }
             sh.write(&buffer);
         }
+
         Ok(format!("{:X}", sh.finish()))
     }
-}
-
-fn content_digest<P, D>(path: &P) -> Result<String>
-where
-    P: AsRef<Path> + ?Sized,
-    D: digest::Digest,
-{
-    let inner = OpenOptions::new().read(true).write(false).create(false).open(path)?;
-    let chunk_iter = BufChunkIterator { inner, chunk_size: CHUNK_SIZE };
-    let mut sh = D::new();
-    for chunk in chunk_iter {
-        sh.input(chunk);
-    }
-    Ok(hex::encode(sh.result()))
 }

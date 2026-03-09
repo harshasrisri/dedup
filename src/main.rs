@@ -59,9 +59,8 @@ async fn main() -> Result<()> {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     error!(
-                        "Digest mode analysis failed at {} using {} and writing out to {}. Error: {e}",
+                        "Digest mode analysis failed at {} and writing out to {}. Error: {e}",
                         args.local_path.display(),
-                        args.digest,
                         args.output_file.display()
                     );
                     std::process::exit(1);

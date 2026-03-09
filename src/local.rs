@@ -8,7 +8,7 @@ use std::{
 use tokio::fs::{canonicalize, metadata};
 use walkdir::WalkDir;
 
-use crate::digest::{DigestFile, DigestKind};
+use crate::digest::DigestFile;
 use crate::file::FileOps;
 
 #[derive(Args, Debug)]
@@ -88,9 +88,9 @@ impl Local {
                     local_file.display(),
                     file_map[&size]
                 );
-                let local_chksum = local_file.digest(DigestKind::SHA1)?;
+                let local_chksum = local_file.chksum()?;
                 for remote_file in &file_map[&size] {
-                    let remote_chksum = remote_file.digest(DigestKind::SHA1)?;
+                    let remote_chksum = remote_file.chksum()?;
                     if local_chksum == remote_chksum {
                         let action = if commit { "removing" } else { "found" };
                         debug!(
