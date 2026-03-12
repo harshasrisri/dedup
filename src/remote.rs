@@ -8,10 +8,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tokio::{
-    fs::metadata,
-    io::{AsyncBufReadExt, BufReader},
-};
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 #[derive(Args, Debug)]
 #[command(arg_required_else_help = true)]
@@ -46,12 +43,9 @@ impl Remote {
                     debug!("Start analyzing file: {}", file_path.display());
                     let file_path_clone = file_path.clone();
                     async {
-                        let chksum = tokio::task::spawn_blocking(move || {
+                        let (size, chksum) = tokio::task::spawn_blocking(move || {
                             file_path_clone.chksum()
                         }).await??;
-                        let size = metadata(&file_path).await
-                            .inspect_err(|e| error!("Error analyzing {}: {e}", file_path.display()))?
-                            .len();
                         debug!("Finished analyzing file: {}", file_path.display());
                         Ok::<_, Box<dyn std::error::Error>>((size, chksum, file_path))
                     }
@@ -59,7 +53,7 @@ impl Remote {
                     .ok()
                 }
             })
-            .buffer_unordered(num_cpus::get());
+            .buffer_unordered(num_cpus::get() * 2);
 
         let (analysis, num_entries) = parse_input(&self.input_file.as_ref().unwrap()).await?;
         let analysis = Arc::new(analysis);
@@ -93,7 +87,7 @@ impl Remote {
 
 async fn parse_input<P: AsRef<Path>>(
     input_file: P,
-) -> Result<(HashMap<u64, HashSet<String>>, usize)> {
+) -> Result<(HashMap<usize, HashSet<String>>, usize)> {
     let filepath = input_file.as_ref();
     let mut entry_count = 0;
     let reader: Box<dyn tokio::io::AsyncRead + Unpin> = match filepath.to_str() {

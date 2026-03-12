@@ -4,13 +4,13 @@ use crate::fs::FileOps;
 use anyhow::Result;
 use clap::Args;
 use futures::{StreamExt, stream};
-use log::{debug, error, info};
+use log::{debug, info};
 use std::fmt::Write;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
-use tokio::fs::{canonicalize, metadata};
+use tokio::fs::canonicalize;
 use tokio::io::{AsyncWriteExt, BufWriter};
 
 #[derive(Args, Debug)]
@@ -49,12 +49,9 @@ impl Analyze {
                     debug!("Start analyzing file: {}", file_path.display());
                     let file_path_clone = file_path.clone();
                     async {
-                        let chksum = tokio::task::spawn_blocking(move || {
+                        let (size, chksum) = tokio::task::spawn_blocking(move || {
                             file_path_clone.chksum()
                         }).await??;
-                        let size = metadata(&file_path).await
-                            .inspect_err(|e| error!("Error analyzing {}: {e}", file_path.display()))?
-                            .len();
                         debug!("Finished analyzing file: {}", file_path.display());
                         Ok::<_, Box<dyn std::error::Error>>((size, chksum))
                     }
@@ -62,7 +59,7 @@ impl Analyze {
                     .ok()
                 }
             })
-            .buffer_unordered(num_cpus::get());
+            .buffer_unordered(num_cpus::get() * 2);
 
         while let Some(Some((size, chksum))) = stream.next().await {
             num_analyzed += 1;
@@ -78,7 +75,7 @@ impl Analyze {
 }
 
 async fn write_output<P: AsRef<Path>>(
-    file_map: &HashMap<u64, HashSet<String>>,
+    file_map: &HashMap<usize, HashSet<String>>,
     output_file: &P,
 ) -> Result<()> {
     let file = output_file.open_rw().await?;
