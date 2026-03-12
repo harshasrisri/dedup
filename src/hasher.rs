@@ -1,5 +1,5 @@
 use anyhow::Result;
-use twox_hash::XxHash64;
+use twox_hash::XxHash3_64;
 use std::hash::Hasher;
 use std::path::Path;
 use std::fs::OpenOptions;
@@ -41,7 +41,7 @@ where
     P: AsRef<Path>,
 {
     fn chksum(&self) -> Result<String> {
-        let mut sh = XxHash64::with_seed(0xdeadbeef);
+        let mut sh = XxHash3_64::with_seed(0xdeadbeef);
         let inner = OpenOptions::new().read(true).write(false).create(false).open(self)?;
         let chunk_iter = BufChunkIterator { inner, chunk_size: CHUNK_SIZE };
         for chunk in chunk_iter {
