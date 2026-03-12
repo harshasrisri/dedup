@@ -47,23 +47,22 @@ impl Analyze {
             .map(move |file_path| {
                 async move {
                     debug!("Start analyzing file: {}", file_path.display());
-                    match async {
-                        let chksum = file_path.chksum()?;
-                        let size = metadata(&file_path).await?.len();
+                    let file_path_clone = file_path.clone();
+                    async {
+                        let chksum = tokio::task::spawn_blocking(move || {
+                            file_path_clone.chksum()
+                        }).await??;
+                        let size = metadata(&file_path).await
+                            .inspect_err(|e| error!("Error analyzing {}: {e}", file_path.display()))?
+                            .len();
                         debug!("Finished analyzing file: {}", file_path.display());
                         Ok::<_, Box<dyn std::error::Error>>((size, chksum))
                     }
                     .await
-                    {
-                        Ok((size, chksum)) => Some((size, chksum)),
-                        Err(e) => {
-                            error!("Error analyzing {}: {e}", file_path.display());
-                            None
-                        }
-                    }
+                    .ok()
                 }
             })
-            .buffer_unordered(num_cpus::get() * 4);
+            .buffer_unordered(num_cpus::get());
 
         while let Some(Some((size, chksum))) = stream.next().await {
             num_analyzed += 1;

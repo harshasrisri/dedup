@@ -45,23 +45,21 @@ impl Remote {
                 async move {
                     debug!("Start analyzing file: {}", file_path.display());
                     let file_path_clone = file_path.clone();
-                    match async {
-                        let chksum = file_path.chksum()?;
-                        let size = metadata(&file_path).await?.len();
+                    async {
+                        let chksum = tokio::task::spawn_blocking(move || {
+                            file_path_clone.chksum()
+                        }).await??;
+                        let size = metadata(&file_path).await
+                            .inspect_err(|e| error!("Error analyzing {}: {e}", file_path.display()))?
+                            .len();
                         debug!("Finished analyzing file: {}", file_path.display());
                         Ok::<_, Box<dyn std::error::Error>>((size, chksum, file_path))
                     }
                     .await
-                    {
-                        Ok((size, chksum, file_path)) => Some((size, chksum, file_path)),
-                        Err(e) => {
-                            error!("Error analyzing {}: {e}", file_path_clone.display());
-                            None
-                        }
-                    }
+                    .ok()
                 }
             })
-            .buffer_unordered(num_cpus::get() * 4);
+            .buffer_unordered(num_cpus::get());
 
         let (analysis, num_entries) = parse_input(&self.input_file.as_ref().unwrap()).await?;
         let analysis = Arc::new(analysis);
