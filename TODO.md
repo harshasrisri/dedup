@@ -42,5 +42,19 @@ Ordered by dependency and priority. Update status as items are completed.
    - Atomic rename on success
 
 9. [ ] Add corruption recovery (warn + rebuild from scratch)
-   - Detect bincode decode errors
-   - Log warning and rebuild cache from scratch
+    - Detect bincode decode errors
+    - Log warning and rebuild cache from scratch
+
+## Optimization (Phase 3)
+
+10. [ ] Benchmark and optimize async concurrency multiplier
+     - Use `perf stat` to measure context switches, cache misses, CPU cycles
+     - Use `heaptrack` or `flamegraph` for memory allocation patterns
+     - Test multipliers: `num_cpus::get() * 1, 2, 3, 4` across analyze/remote/local
+     - Compare metrics: elapsed time, CPU saturation, context switches, memory usage
+     - Empirical data shows `* 4` is ~1s slower than `* 1` on 24-core system with 41k files
+     - Determine optimal multiplier and update buffer_unordered() calls accordingly
+
+## Notes
+
+- **XXH3_64 optimization**: Tested switching from XXH64 to XXH3_64, but saw no measurable difference in time or CPU usage. Indicates hashing is not the bottleneck; real bottleneck is likely file I/O, data structure ops, or async overhead. Defer deep profiling to later if needed.
